@@ -2,10 +2,37 @@
 "use strict";
 
 const fs = require("node:fs");
+const path = require("node:path");
 const ipc = require("../lib/ipc.js");
 const ui = require("../lib/ui.js");
 
 const HEADLESS = process.env.HANDOFF_PICKER_HEADLESS === "1";
+
+// The picker runs inside a popup pane whose terminal disappears the moment the
+// process ends, taking any stderr with it. Without this trace a crash in here is
+// completely invisible: the popup just blinks and the waiting action hangs.
+const TRACE = process.env.HANDOFF_PICKER_TRACE === "0" ? null : traceFile();
+
+function traceFile() {
+  const dir = process.env.HERDR_PLUGIN_STATE_DIR;
+  if (!dir) return null;
+  return path.join(dir, "picker.log");
+}
+
+const TRACE_MAX_BYTES = 64 * 1024;
+
+function trace(message) {
+  if (!TRACE) return;
+  try {
+    // Keep the log bounded; it is a rolling record of recent launches only.
+    if (fs.existsSync(TRACE) && fs.statSync(TRACE).size > TRACE_MAX_BYTES) {
+      fs.rmSync(TRACE, { force: true });
+    }
+    fs.appendFileSync(TRACE, `${new Date().toISOString()} pid=${process.pid} ${message}\n`);
+  } catch {
+    // diagnostics must never break the picker
+  }
+}
 
 function loadRequest() {
   const file = process.env.HERDR_HANDOFF_REQUEST;
@@ -80,8 +107,13 @@ function runInteractive(request) {
   if (stdin.isTTY) stdin.setRawMode(true);
   stdin.resume();
   draw(state);
+  trace("interactive loop armed");
+
+  stdin.on("error", (err) => trace(`stdin error ${err.message}`));
+  stdin.on("close", () => trace("stdin close"));
 
   stdin.on("data", (buf) => {
+    trace(`stdin data ${JSON.stringify(buf.toString("binary"))}`);
     for (const event of ui.decodeInput(buf)) {
       const out = event.type === "mouse"
         ? ui.applyClick(state, event.row)
@@ -99,20 +131,48 @@ function runInteractive(request) {
     draw(state);
   });
 
-  stdin.on("end", () => finish(request.resultPath, { cancelled: true }, teardown));
-  process.on("SIGINT", () => finish(request.resultPath, { cancelled: true }, teardown));
-  process.on("SIGTERM", () => finish(request.resultPath, { cancelled: true }, teardown));
+  stdin.on("end", () => {
+    trace("stdin end -> cancel");
+    finish(request.resultPath, { cancelled: true }, teardown);
+  });
+  process.on("SIGINT", () => {
+    trace("SIGINT -> cancel");
+    finish(request.resultPath, { cancelled: true }, teardown);
+  });
+  process.on("SIGTERM", () => {
+    trace("SIGTERM -> cancel");
+    finish(request.resultPath, { cancelled: true }, teardown);
+  });
+  process.on("SIGHUP", () => {
+    trace("SIGHUP -> cancel");
+    finish(request.resultPath, { cancelled: true }, teardown);
+  });
 }
 
 function main() {
+  trace(
+    `start headless=${HEADLESS} cwd=${process.cwd()} ` +
+    `isTTY=${Boolean(process.stdin.isTTY)} cols=${process.stdout.columns} rows=${process.stdout.rows} ` +
+    `request=${process.env.HERDR_HANDOFF_REQUEST || "UNSET"}`
+  );
+
+  process.on("uncaughtException", (err) => {
+    trace(`uncaughtException ${err && err.stack ? err.stack : err}`);
+    process.exit(1);
+  });
+  process.on("exit", (code) => trace(`exit code=${code}`));
+
   let loaded;
   try {
     loaded = loadRequest();
   } catch (err) {
+    trace(`loadRequest failed: ${err.message}`);
     process.stderr.write(`agent-handoff picker: ${err.message}\n`);
     process.exit(1);
     return;
   }
+
+  trace(`request loaded, ${loaded.request.available.length} agents available`);
   if (HEADLESS) runHeadless(loaded.request);
   else runInteractive(loaded.request);
 }

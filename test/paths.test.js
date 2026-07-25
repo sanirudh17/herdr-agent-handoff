@@ -13,6 +13,28 @@ test("stateDir falls back to a cwd-relative dir when env is absent", () => {
   assert.ok(path.isAbsolute(got), `expected absolute path, got ${got}`);
 });
 
+test("stripVerbatim removes the Windows \\\\?\\ prefix", () => {
+  assert.equal(paths.stripVerbatim("\\\\?\\C:\\Users\\sanir\\Herdr plugin"), "C:\\Users\\sanir\\Herdr plugin");
+});
+
+test("stripVerbatim leaves ordinary paths untouched", () => {
+  assert.equal(paths.stripVerbatim("C:\\Users\\sanir"), "C:\\Users\\sanir");
+  assert.equal(paths.stripVerbatim("/home/u/plugin"), "/home/u/plugin");
+  assert.equal(paths.stripVerbatim(""), "");
+  assert.equal(paths.stripVerbatim(undefined), "");
+});
+
+test("pluginRoot returns HERDR_PLUGIN_ROOT with the verbatim prefix stripped", () => {
+  assert.equal(
+    paths.pluginRoot({ HERDR_PLUGIN_ROOT: "\\\\?\\C:\\p" }),
+    "C:\\p"
+  );
+});
+
+test("pluginRoot falls back to cwd when the env var is absent", () => {
+  assert.equal(paths.pluginRoot({}), paths.stripVerbatim(process.cwd()));
+});
+
 test("handoffsDir and requestsDir sit under stateDir", () => {
   const dir = path.join(path.sep, "tmp", "state");
   const env = { HERDR_PLUGIN_STATE_DIR: dir };

@@ -33,4 +33,14 @@ description = "Choose the agent to hand off to"
 placement = "popup"
 width = "70%"
 height = "70%"
-command = ["node", "bin/picker.js"]
+# Launched via `node -e` rather than `node bin/picker.js` on purpose.
+#
+# Herdr sets a plugin pane's cwd to the plugin root as a Windows verbatim path
+# (\\?\C:\...). Node cannot resolve a *relative main script* from such a cwd: it
+# calls realpathSync during resolveMainPath, walks the components, and dies with
+# "EISDIR: illegal operation on a directory, lstat 'C:'" before any plugin code
+# runs — the popup blinks and vanishes. Passing code to -e skips main-module
+# resolution entirely, so the picker is located from HERDR_PLUGIN_ROOT (verbatim
+# prefix stripped) and required by absolute path. Independent of cwd on every
+# platform.
+command = ["node", "-e", '''require(require('path').join((process.env.HERDR_PLUGIN_ROOT || process.cwd()).replace(/^\\\\\?\\/, ''), 'bin', 'picker.js'))''']
