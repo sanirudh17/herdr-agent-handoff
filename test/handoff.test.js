@@ -37,8 +37,9 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
     // Real delivery backoff spans about a minute; the tests should not.
     HANDOFF_SETTLE_MS: "0",
-    HANDOFF_CONFIRM_WINDOW_MS: "150",
-    HANDOFF_RETRY_BACKOFF_MS: "0,0,0",
+    HANDOFF_QUIET_MS: "0",
+    HANDOFF_READY_CAP_MS: "0",
+    HANDOFF_CONFIRM_WINDOW_MS: "300",
     // By default the fake agent reacts to a prompt, as a healthy one would.
     HANDOFF_FAKE_GET_COUNT: path.join(home, "agent-get-count.txt"),
     HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
@@ -207,56 +208,88 @@ test("a failed pane-shell launch reports and does not prompt", async () => {
 test("a failed prompt reports the prompt failure", async () => {
   const { env } = workspace();
   env.HANDOFF_FAKE_FAIL = "agent prompt";
-  env.HANDOFF_FAKE_REACTS = "never"; // the agent never stirs, so nothing landed
+  // Neither proof of delivery: nothing on screen, and the agent never stirs.
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_NO_SEQ = "1";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
 });
 
-test("the prompt is submitted with a delivery wait, not fire-and-forget", async () => {
-  const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  const prompt = readCalls(calls).find((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.ok(prompt.includes("--wait"), "a swallowed prompt must be detectable");
-  assert.ok(prompt.includes("--until"), "and confirmed by an observed state change");
-});
-
-test("a swallowed prompt is retried until the agent finally reacts", async () => {
-  const { env, calls, home } = workspace();
-  // An agent still painting its TUI swallows the text and never stirs. Only then
-  // is a retry safe, because nothing landed and nothing can be duplicated.
-  env.HANDOFF_FAKE_FAIL = "agent prompt";
-  env.HANDOFF_FAKE_ERROR_CODE = "agent_prompt_stalled";
-  env.HANDOFF_FAKE_FAIL_TIMES = "1";
-  env.HANDOFF_FAKE_COUNT = path.join(home, "attempts.txt");
-  env.HANDOFF_FAKE_REACTS = "never";
-
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  assert.equal(out.ok, true, "the retry should land the handoff");
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 2, "swallowed once, retried once");
-});
-
-test("a wait that reports failure is overruled by the agent actually reacting", async () => {
-  const { env, calls } = workspace();
-  // This is the false negative that reported "did not accept the handoff" while
-  // pi was visibly working: the wait errored, but the agent had reacted.
-  env.HANDOFF_FAKE_FAIL = "agent prompt";
-  env.HANDOFF_FAKE_ERROR_CODE = "timeout";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  assert.equal(out.ok, true, "a reacting agent means the prompt was delivered");
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 1, "no retry: the text was not swallowed");
-});
-
-test("delivery is confirmed against the agent, not just the submit call", async () => {
+test("delivery is proven by the prompt appearing in the target, not by the submit call", async () => {
   const { env, calls } = workspace();
   await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   const argv = readCalls(calls).map((c) => c.join(" "));
   assert.ok(
-    argv.some((a) => a.startsWith("agent get w5:p2")),
-    "the target's own state is the proof of delivery"
+    argv.some((a) => a.startsWith("agent read w5:p2")),
+    "the target's own screen is the proof of delivery"
   );
+});
+
+test("a confirmed prompt is submitted only once", async () => {
+  const { env, calls } = workspace();
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 1, "confirmation stops the loop immediately");
+});
+
+test("a dropped prompt is retried until it appears", async () => {
+  // Antigravity discards input until it has finished signing in, so the first
+  // submissions vanish and a later one lands.
+  const { env, calls } = workspace();
+  env.HANDOFF_FAKE_SWALLOW_FIRST = "2";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, true);
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 3, "dropped twice, landed on the third");
+});
+
+test("retries stop at the attempt limit and report honestly", async () => {
+  const { env, calls } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_DELIVERY_ATTEMPTS = "3";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, false, "unconfirmed delivery is never reported as success");
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 3, "bounded, not endless");
+});
+
+test("a state change alone is never treated as delivery", async () => {
+  // agy churns through states while signing in. Live, that was mistaken for a
+  // delivered handoff while it sat at an empty prompt.
+  const { env, home } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never"; // nothing on screen
+  env.HANDOFF_FAKE_GET_COUNT = path.join(home, "seq.txt"); // but the state moves
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, false, "churn is not proof the prompt arrived");
+  assert.equal(out.message, MESSAGES.promptFailed("Antigravity CLI"));
+});
+
+test("closing the target mid-confirmation is not reported as a failure", async () => {
+  const { env } = workspace();
+  // The user read the result and closed the pane. The handoff worked; saying it
+  // failed would be a lie.
+  env.HANDOFF_FAKE_FAIL = "agent read";
+  env.HANDOFF_FAKE_ERROR_CODE = "agent_not_found";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true);
+  assert.equal(out.closed, true);
+  assert.equal(out.message, "", "no toast for a pane the user deliberately closed");
+});
+
+test("the source pane's screen is never read, only the target's", async () => {
+  const { env, calls } = workspace();
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  for (const call of readCalls(calls)) {
+    const text = call.join(" ");
+    assert.ok(!text.startsWith("pane read"), "pane scrollback is never a source of context");
+    if (text.startsWith("agent read")) {
+      assert.ok(
+        !text.includes("w5:p1"),
+        `the source pane's screen must never be read: ${text}`
+      );
+    }
+  }
 });
 
 test("only installed agents are offered to the picker", async () => {

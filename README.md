@@ -114,10 +114,15 @@ The handoff never degrades. If the complete session cannot be obtained, it does 
 
 > Full handoff unavailable: complete session context could not be retrieved for this source agent.
 
-There is no fallback to a truncated transcript, recent terminal output, a git diff, or a summary.
-`pane read` is never called anywhere in this codebase, which is enforced by a check in the test suite.
+There is no fallback to a truncated transcript, recent terminal output, a git diff, or a summary. The
+**source** pane is only ever read through `pane get`; its scrollback is never touched, which the test
+suite enforces. The **target's** screen is read once the handoff is sent, purely to confirm the prompt
+arrived — some agents discard input until they have finished starting up, and the confirmation toast
+is withheld until the prompt is actually visible rather than announced optimistically.
+
 If the target fails to start or accept the handoff, you are told which step failed and the source is
-left untouched.
+left untouched. If you close the target while that confirmation is still in flight, nothing is
+reported: the handoff worked and you moved on.
 
 ## Development
 

@@ -101,10 +101,11 @@ function runInteractive(request) {
   let state = buildState(request);
   const { stdin, stdout } = process;
 
-  // Alternate screen, hide cursor, enable SGR mouse reporting.
-  stdout.write("\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h");
+  // Alternate screen, hide cursor, SGR mouse reporting. 1003 reports motion too,
+  // which is what makes hover highlighting possible.
+  stdout.write("\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1003h\x1b[?1006h");
   const teardown = () => {
-    stdout.write("\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l");
+    stdout.write("\x1b[?1006l\x1b[?1003l\x1b[?1000l\x1b[?25h\x1b[?1049l");
     if (stdin.isTTY) stdin.setRawMode(false);
     stdin.pause();
   };
@@ -120,6 +121,10 @@ function runInteractive(request) {
   stdin.on("data", (buf) => {
     trace(`stdin data ${JSON.stringify(buf.toString("binary"))}`);
     for (const event of ui.decodeInput(buf)) {
+      if (event.type === "hover") {
+        state = ui.applyHover(state, event.row, event.col);
+        continue;
+      }
       const out = event.type === "mouse"
         ? ui.applyClick(state, event.row, event.col)
         : ui.applyKey(state, event.name);

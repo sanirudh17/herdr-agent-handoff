@@ -14,6 +14,8 @@ function configWith(name) {
 }
 
 const catppuccin = { palette: themeLib.resolveTheme(configWith("catppuccin")).palette };
+// Rows above the agent list: tabs, blank, context, blank.
+const HEADER_ROWS_FOR_TEST = 4;
 
 const INSTALLED = [
   { kind: "claude", name: "Claude Code" },
@@ -55,6 +57,94 @@ test("decodeInput maps arrows, vim keys, tab, enter, escape and digits", () => {
   assert.deepEqual(seen("\x03"), ["ctrl-c"]);
   assert.deepEqual(seen("?"), ["?"]);
   assert.deepEqual(seen("3"), ["3"]);
+});
+
+test("mouse motion is reported as hover, distinct from a press", () => {
+  const move = ui.decodeInput(Buffer.from("\x1b[<35;10;7M"));
+  assert.equal(move[0].type, "hover", "bit 5 marks motion");
+  const press = ui.decodeInput(Buffer.from("\x1b[<0;10;7M"));
+  assert.equal(press[0].type, "mouse");
+});
+
+test("hovering a tab highlights it without switching sections", () => {
+  const s = state();
+  const col = ui.renderFrame(s)[0].indexOf("not installed");
+  const hovered = ui.applyHover(s, 0, col);
+  assert.deepEqual(hovered.hover, { kind: "tab", key: "notInstalled" });
+  assert.equal(hovered.section, "installed", "hover must not change the section");
+
+  const styled = ui.renderFrame({ ...hovered, theme: catppuccin }, { styled: true })[0];
+  const plainStyled = ui.renderFrame({ ...s, theme: catppuccin }, { styled: true })[0];
+  assert.notEqual(styled, plainStyled, "the hovered tab should look different");
+});
+
+test("hovering an agent row highlights the whole row", () => {
+  const s = state({ theme: catppuccin });
+  const row = ui.renderFrame(s).findIndex((l) => l.includes("Codex"));
+  const hovered = ui.applyHover(s, row, 5);
+  assert.deepEqual(hovered.hover, { kind: "row", section: "installed", index: 1 });
+
+  const line = ui.renderFrame(hovered, { styled: true })[row];
+  // catppuccin overlay0, spanning the full width.
+  assert.match(line, /\x1b\[48;2;108;112;134m/);
+});
+
+test("hover, selection and the active tab are three different colours", () => {
+  const s = { ...state({ theme: catppuccin }) };
+  const row = ui.renderFrame(s).findIndex((l) => l.includes("Codex"));
+  const hovered = ui.renderFrame(ui.applyHover(s, row, 5), { styled: true });
+  const cursorLine = hovered[HEADER_ROWS_FOR_TEST];
+  const hoverLine = hovered[row];
+  const tab = hovered[0];
+
+  const bgOf = (line) => (line.match(/\x1b\[48;2;\d+;\d+;\d+m/) || [""])[0];
+  assert.notEqual(bgOf(hoverLine), bgOf(cursorLine), "hover must differ from selection");
+  assert.notEqual(bgOf(hoverLine), bgOf(tab), "hover must differ from the accent");
+  assert.notEqual(bgOf(cursorLine), bgOf(tab), "selection must differ from the accent");
+});
+
+test("hover highlights span the full width, like the cursor row", () => {
+  const s = state({ theme: catppuccin });
+  const row = ui.renderFrame(s).findIndex((l) => l.includes("Codex"));
+  const hovered = ui.applyHover(s, row, 5);
+  const plain = ui.renderFrame(hovered)[row];
+  assert.equal(plain.length, 78, "a highlighted row must fill the pane width");
+  const cursor = ui.renderFrame(s)[HEADER_ROWS_FOR_TEST];
+  assert.equal(cursor.length, 78, "so must the cursor row");
+});
+
+test("hovering the not-installed section works too", () => {
+  let s = state();
+  ({ state: s } = ui.applyKey(s, "tab"));
+  const row = ui.renderFrame(s).findIndex((l) => l.includes("Unavailable 1"));
+  const hovered = ui.applyHover(s, row, 5);
+  assert.deepEqual(hovered.hover, { kind: "row", section: "notInstalled", index: 1 });
+});
+
+test("hovering nothing clears the highlight", () => {
+  const s = ui.applyHover(state(), 0, 2);
+  assert.ok(s.hover);
+  const cleared = ui.applyHover(s, 2, 5);
+  assert.equal(cleared.hover, null);
+});
+
+test("both tab chips are the same width so the fill is symmetrical", () => {
+  const header = ui.renderFrame(state())[0];
+  const width = "not installed (14)".length; // the longer label sets the chip width
+  assert.ok(
+    header.includes(` ${"installed (4)".padEnd(width)} `),
+    `the shorter chip should be padded to match: ${JSON.stringify(header)}`
+  );
+  assert.ok(header.includes(` ${"not installed (14)".padEnd(width)} `));
+});
+
+test("the accent fill covers the whole chip, not just the label", () => {
+  const frame = ui.renderFrame(state({ theme: catppuccin }), { styled: true });
+  const accentStart = frame[0].indexOf("\x1b[48;2;137;180;250m");
+  assert.ok(accentStart >= 0, "the active chip should be filled");
+  // Everything from the fill up to the reset is one accent run, padding included.
+  const run = frame[0].slice(accentStart).split("\x1b[0m")[0];
+  assert.match(run, /installed \(4\) {5} $/, "padding must be inside the fill");
 });
 
 test("decodeInput parses an SGR mouse press and ignores the release", () => {

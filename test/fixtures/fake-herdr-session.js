@@ -120,11 +120,14 @@ if (argv[0] === "agent" && argv[1] === "rename") ok({ type: "agent_info", agent:
 // The agent record the delivery check reads. HANDOFF_FAKE_REACTS decides whether
 // the agent appears to react to a prompt: "never" models an agent whose TUI
 // swallows input while it is still starting up.
+// Two independent knobs, because delivery has two independent proofs:
+//   HANDOFF_FAKE_REACTS=never  -> the screen never echoes the prompt
+//   HANDOFF_FAKE_NO_SEQ=1      -> the agent never changes state either
 if (argv[0] === "agent" && argv[1] === "get") {
-  const reacts = process.env.HANDOFF_FAKE_REACTS !== "never";
+  const stirs = process.env.HANDOFF_FAKE_NO_SEQ !== "1";
   const countFile = process.env.HANDOFF_FAKE_GET_COUNT;
   let seq = 0;
-  if (countFile) {
+  if (stirs && countFile) {
     try {
       seq = Number(fs.readFileSync(countFile, "utf8")) || 0;
     } catch {
@@ -137,10 +140,35 @@ if (argv[0] === "agent" && argv[1] === "get") {
     agent: {
       terminal_id: "t2", workspace_id: "w5", tab_id: "w5:t1", pane_id: argv[2],
       focused: false, revision: 1, agent: agent || "claude",
-      agent_status: reacts && seq > 0 ? "working" : "idle",
-      state_change_seq: reacts ? seq : 0,
+      agent_status: stirs && seq > 0 ? "working" : "idle",
+      state_change_seq: seq,
     },
   });
+}
+
+// The target's screen. A healthy agent echoes the prompt it was given, so the
+// recorded calls are the source of truth: if a prompt was submitted, it shows.
+// HANDOFF_FAKE_REACTS=never models a TUI that swallows input while still starting.
+if (argv[0] === "agent" && argv[1] === "read") {
+  let text = "";
+  // HANDOFF_FAKE_SWALLOW_FIRST=n discards the first n submissions, modelling an
+  // agent whose input box is not listening yet.
+  const swallow = Number(process.env.HANDOFF_FAKE_SWALLOW_FIRST || "0");
+  if (process.env.HANDOFF_FAKE_REACTS !== "never" && callsFile) {
+    try {
+      let prompts = 0;
+      for (const line of fs.readFileSync(callsFile, "utf8").split("\n").filter(Boolean)) {
+        const call = JSON.parse(line);
+        if (call[0] === "agent" && call[1] === "prompt" && call[2] === argv[2]) {
+          prompts += 1;
+          if (prompts > swallow) text = call[3];
+        }
+      }
+    } catch {
+      text = "";
+    }
+  }
+  ok({ type: "pane_read", text });
 }
 
 if (argv[0] === "agent" && argv[1] === "prompt") ok({ type: "agent_prompted" });
