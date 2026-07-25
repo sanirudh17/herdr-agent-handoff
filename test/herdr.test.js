@@ -30,6 +30,11 @@ test("run throws HerdrCliError carrying the envelope code and message", () => {
   );
 });
 
+test("run tolerates a UTF-8 BOM on the response", () => {
+  const out = run([FAKE, "bom"], { env: fakeEnv });
+  assert.equal(out.type, "echo");
+});
+
 test("run throws on non-zero exit with unparseable output", () => {
   assert.throws(() => run([FAKE, "fail-garbage"], { env: fakeEnv }), HerdrCliError);
 });

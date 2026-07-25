@@ -20,6 +20,11 @@ if (args[0] === "ok-garbage") {
   process.exit(0);
 }
 
+if (args[0] === "bom") {
+  process.stdout.write("﻿" + JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) + "\n");
+  process.exit(0);
+}
+
 if (args[0] === "plain") {
   process.stdout.write("Config: /home/u/.config/herdr/config.toml\n");
   process.exit(0);
