@@ -98,6 +98,27 @@ test("? toggles the unavailable block without moving the cursor", () => {
   assert.equal(s.showUnavailable, false);
 });
 
+test("revealing unavailable agents never hides an available one", () => {
+  let s = state();
+  const before = ui.renderFrame(s);
+  const visibleAgents = (frame) =>
+    AVAILABLE.filter((a) => frame.some((line) => line.includes(a.name))).length;
+  assert.equal(visibleAgents(before), AVAILABLE.length, "all four should be visible to begin with");
+
+  ({ state: s } = ui.applyKey(s, "?"));
+  const after = ui.renderFrame(s);
+  assert.equal(visibleAgents(after), AVAILABLE.length, "selectable agents must survive the toggle");
+  assert.ok(after.some((l) => l.includes("not installed")), "the block should have appeared");
+});
+
+test("the unavailable block reports how many it could not fit", () => {
+  const many = Array.from({ length: 14 }, (_, i) => ({ kind: `u${i}`, name: `Unavail ${i}` }));
+  let s = state({ unavailable: many, unavailableCount: 14, height: 20 });
+  ({ state: s } = ui.applyKey(s, "?"));
+  const text = ui.renderFrame(s).join("\n");
+  assert.match(text, /not installed \(\d+ more\):/);
+});
+
 test("clicking an agent row selects it", () => {
   const s = state();
   const frame = ui.renderFrame(s);
