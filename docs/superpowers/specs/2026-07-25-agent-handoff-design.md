@@ -209,11 +209,15 @@ no future change bakes in a UUID pattern.
 
 Extraction:
 
-1. Copy `opencode.db`, `-wal` and `-shm` together into the snapshot working directory. opencode runs
-   in WAL mode, so a read-only open of the live file can fail while opencode holds it; copying all
-   three lets SQLite recover a consistent view from the copied WAL.
-2. Open the **copy** read-only via `node:sqlite` (`new DatabaseSync(path, { readOnly: true })`).
-   The user's live database is never opened, never locked, and never written.
+1. Open the live database **read-only** via `node:sqlite`
+   (`new DatabaseSync(path, { readOnly: true })`). A read-only connection to a WAL database gets a
+   consistent snapshot even while opencode is writing, so there is no need to copy first. Measured
+   against the real store on this machine — 304 MB with a 20 MB `-wal`, opencode idle but the file
+   live — a direct open plus full session export took **13 ms**. Copying first would have moved
+   324 MB per handoff for no benefit. The database is never written and never locked for writing.
+2. If and only if the read-only open is *refused* (a `-wal` needing recovery, for example), fall back
+   to copying `opencode.db`, `-wal` and `-shm` into the working directory and opening the copy
+   read-only. The copies are deleted when the export finishes.
 3. Emit one JSONL line per row, in deterministic order, with every `data` column preserved verbatim:
    the `session` row, then `message` ordered by `(time_created, id)`, then `part` ordered by
    `(message_id, time_created, id)`, then `session_message` ordered by `(seq, id)`, then `todo`
