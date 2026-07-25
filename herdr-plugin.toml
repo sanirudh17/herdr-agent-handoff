@@ -1,0 +1,36 @@
+id = "agent-handoff"
+name = "Agent Handoff"
+version = "0.1.0"
+min_herdr_version = "0.7.5"
+description = "Transfer an in-progress session to a fresh session of another installed agent"
+platforms = ["linux", "macos", "windows"]
+
+[[actions]]
+id = "handoff-split"
+title = "Handoff to agent (split)"
+description = "Transfer the active agent session to a fresh agent beside it"
+contexts = ["pane"]
+command = ["node", "bin/handoff-split.js"]
+
+[[actions]]
+id = "handoff-tab"
+title = "Handoff to agent (new tab)"
+description = "Transfer the active agent session to a fresh agent in a new tab"
+contexts = ["pane"]
+command = ["node", "bin/handoff-tab.js"]
+
+[[actions]]
+id = "setup-keys"
+title = "Install Agent Handoff keybindings"
+description = "Add prefix+a and prefix+shift+a to config.toml"
+contexts = ["global"]
+command = ["node", "bin/setup-keys.js"]
+
+[[panes]]
+id = "picker"
+title = "Handoff to Agent"
+description = "Choose the agent to hand off to"
+placement = "popup"
+width = "70%"
+height = "70%"
+command = ["node", "bin/picker.js"]

@@ -1,0 +1,10 @@
+{
+  "name": "herdr-agent-handoff",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Full-session ownership transfer between Herdr-supported coding agents",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  }
+}

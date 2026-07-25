@@ -1,0 +1,4 @@
+node_modules/
+.agent-handoff-state/
+.agent-handoff-config/
+*.log
