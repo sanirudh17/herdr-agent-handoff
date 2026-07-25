@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { run, MESSAGES, shellIsAtPrompt } = require("../lib/handoff.js");
+const { run, MESSAGES, shellIsAtPrompt, startingUp } = require("../lib/handoff.js");
 
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
@@ -318,6 +318,28 @@ test("the picker request carries the not-installed roster so it can be browsed",
   const out = await run({ destination: "tab", env, dryRun: true });
   assert.ok(out.request.notInstalled.every((a) => a.kind && a.name));
   assert.ok(out.request.notInstalled.some((a) => a.kind === "gemini"));
+});
+
+test("a screen showing sign-in text means the target is not ready", () => {
+  // Antigravity's own wording, plus the phrasings other agents use.
+  assert.equal(startingUp("  Signing in...  ? for shortcuts"), true);
+  assert.equal(startingUp("Authenticating with the API"), true);
+  assert.equal(startingUp("Please wait, initializing"), true);
+  assert.equal(startingUp("LOGGING IN"), true, "matching is case-insensitive");
+});
+
+test("an ordinary agent prompt counts as ready", () => {
+  // Crucially, a spinner or a token counter must NOT read as "starting up": that
+  // is what kept every handoff waiting out the whole cap for ninety seconds.
+  assert.equal(startingUp("> \n? for shortcuts   Gemini 3.6 Flash · low"), false);
+  assert.equal(startingUp("⠹ Working... 3%/272k · $0.04"), false);
+  assert.equal(startingUp(""), false);
+  assert.equal(startingUp(null), false);
+});
+
+test("a slow-starting target is announced instead of leaving a silent pane", () => {
+  assert.match(MESSAGES.startingUp("Antigravity CLI"), /still starting up/i);
+  assert.match(MESSAGES.startingUp("Antigravity CLI"), /Antigravity CLI/);
 });
 
 test("a shell listing only itself in the foreground is at its prompt", () => {

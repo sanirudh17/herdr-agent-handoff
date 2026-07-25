@@ -109,20 +109,25 @@ test("styles emit truecolour SGR built from the resolved palette", () => {
   const s = theme.styles(theme.resolveTheme(configFile('[theme]\nname = "catppuccin"\n')));
   assert.match(s.activeTab, /\x1b\[48;2;137;180;250m/, "active tab sits on the accent");
   assert.match(s.activeTab, /\x1b\[38;2;24;24;37m/, "with the panel background as text");
-  assert.match(s.cursorRow, /\x1b\[48;2;49;50;68m/, "cursor row uses surface0, not the accent");
-  assert.match(s.cursorRow, /\x1b\[38;2;205;214;244m/, "with normal text on top");
+  // The focused row carries the accent, so the selection reads as one solid block.
+  assert.match(s.cursorRow, /\x1b\[48;2;137;180;250m/, "cursor row uses the accent");
+  assert.match(s.hoverRow, /\x1b\[48;2;49;50;68m/, "the pointer gets the quieter surface");
   assert.match(s.primaryChip, /\x1b\[48;2;137;180;250m/);
   assert.match(s.secondaryChip, /\x1b\[48;2;49;50;68m/);
 });
 
-test("the cursor row is never painted in the accent colour", () => {
+test("every theme paints the focused row in its own accent", () => {
   for (const name of Object.keys(theme.THEME_ALIASES)) {
     const resolved = theme.resolveTheme(configFile(`[theme]\nname = "${name}"\n`));
     const s = theme.styles(resolved);
     const accentBg = theme.bg(resolved.palette.accent);
     assert.ok(
-      !s.cursorRow.includes(accentBg),
-      `${name}: the selected row should use surface0, matching Herdr's settings modal`
+      s.cursorRow.includes(accentBg),
+      `${name}: the focused row should be filled with the theme's accent`
+    );
+    assert.ok(
+      !s.hoverRow.includes(accentBg),
+      `${name}: hover must stay distinguishable from the selection`
     );
   }
 });

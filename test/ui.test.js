@@ -85,22 +85,20 @@ test("hovering an agent row highlights the whole row", () => {
   assert.deepEqual(hovered.hover, { kind: "row", section: "installed", index: 1 });
 
   const line = ui.renderFrame(hovered, { styled: true })[row];
-  // catppuccin overlay0, spanning the full width.
-  assert.match(line, /\x1b\[48;2;108;112;134m/);
+  // catppuccin surface0, spanning the full width.
+  assert.match(line, /\x1b\[48;2;49;50;68m/);
 });
 
-test("hover, selection and the active tab are three different colours", () => {
+test("hover stays distinguishable from the accent-filled selection", () => {
   const s = { ...state({ theme: catppuccin }) };
   const row = ui.renderFrame(s).findIndex((l) => l.includes("Codex"));
   const hovered = ui.renderFrame(ui.applyHover(s, row, 5), { styled: true });
   const cursorLine = hovered[HEADER_ROWS_FOR_TEST];
   const hoverLine = hovered[row];
-  const tab = hovered[0];
 
   const bgOf = (line) => (line.match(/\x1b\[48;2;\d+;\d+;\d+m/) || [""])[0];
   assert.notEqual(bgOf(hoverLine), bgOf(cursorLine), "hover must differ from selection");
-  assert.notEqual(bgOf(hoverLine), bgOf(tab), "hover must differ from the accent");
-  assert.notEqual(bgOf(cursorLine), bgOf(tab), "selection must differ from the accent");
+  assert.equal(bgOf(cursorLine), "\x1b[48;2;137;180;250m", "selection is the accent");
 });
 
 test("hover highlights span the full width, like the cursor row", () => {
@@ -246,6 +244,41 @@ test("? jumps to the not-installed section and back", () => {
   assert.equal(s.section, "installed");
 });
 
+test("the not-installed section has its own moving indicator", () => {
+  let s = state();
+  ({ state: s } = ui.applyKey(s, "tab"));
+  const marked = (frame) => frame.filter((l) => l.includes("▸"));
+
+  let frame = ui.renderFrame(s);
+  assert.equal(marked(frame).length, 1, "browsing needs a marker to show where you are");
+  assert.match(marked(frame)[0], /Unavailable 0/, "starts at the first entry");
+
+  ({ state: s } = ui.applyKey(s, "down"));
+  frame = ui.renderFrame(s);
+  assert.match(marked(frame)[0], /Unavailable 1/, "one arrow press moves one entry");
+
+  ({ state: s } = ui.applyKey(s, "down"));
+  ({ state: s } = ui.applyKey(s, "up"));
+  assert.match(marked(ui.renderFrame(s))[0], /Unavailable 1/, "and back again");
+});
+
+test("each section remembers where its own indicator was", () => {
+  let s = state();
+  ({ state: s } = ui.applyKey(s, "down"));
+  ({ state: s } = ui.applyKey(s, "down"));   // installed -> index 2
+  ({ state: s } = ui.applyKey(s, "tab"));
+  ({ state: s } = ui.applyKey(s, "down"));   // not installed -> index 1
+  ({ state: s } = ui.applyKey(s, "tab"));    // back to installed
+  assert.equal(s.cursor, 2, "the installed cursor should not have moved");
+  assert.equal(s.missingCursor, 1);
+});
+
+test("the focused not-installed row is still not selectable", () => {
+  let s = state();
+  ({ state: s } = ui.applyKey(s, "tab"));
+  assert.equal(ui.applyKey(s, "enter").action, null);
+});
+
 test("the not-installed section scrolls all the way to the last entry", () => {
   let s = state({ height: 14 });
   ({ state: s } = ui.applyKey(s, "tab"));
@@ -362,32 +395,21 @@ test("styled output reproduces Herdr's settings-modal styling, never reverse vid
   const all = frame.join("\n");
   assert.ok(!all.includes("\x1b[7m"), "reverse video ignores the theme and must not be used");
 
-  // Selected row: surface0 fill with normal text, as Herdr's list highlight does.
+  // Focused row: accent fill with the panel background as text.
   const cursorRow = frame.find((l) => l.includes("Claude Code"));
-  assert.match(cursorRow, /\x1b\[48;2;49;50;68m/, "cursor row uses surface0");
-  assert.match(cursorRow, /\x1b\[38;2;205;214;244m/, "cursor row uses normal text");
+  assert.match(cursorRow, /\x1b\[48;2;137;180;250m/, "cursor row uses the accent");
+  assert.match(cursorRow, /\x1b\[38;2;24;24;37m/, "accent fills use panel_bg as text");
 
-  // Active tab and primary chip: accent fill with the panel background as text.
   assert.match(frame[0], /\x1b\[48;2;137;180;250m/, "active tab uses the accent");
-  assert.match(frame[0], /\x1b\[38;2;24;24;37m/, "accent fills use panel_bg as text");
   assert.match(frame[frame.length - 1], /\x1b\[48;2;137;180;250m/, "primary chip uses the accent");
-});
-
-test("the cursor row is never painted in the accent colour", () => {
-  const frame = ui.renderFrame(state({ theme: catppuccin }), { styled: true });
-  const cursorRow = frame.find((l) => l.includes("Claude Code"));
-  assert.ok(
-    !cursorRow.includes("\x1b[48;2;137;180;250m"),
-    "the accent is for tabs and chips; the selected row is a surface"
-  );
 });
 
 test("a different theme yields different colours", () => {
   const solarized = { palette: themeLib.resolveTheme(configWith("solarized-light")).palette };
   const frame = ui.renderFrame(state({ theme: solarized }), { styled: true });
   const cursorRow = frame.find((l) => l.includes("Claude Code"));
-  assert.match(cursorRow, /\x1b\[48;2;238;232;213m/, "solarized-light surface0");
-  assert.ok(!cursorRow.includes("48;2;49;50;68"), "must not fall back to catppuccin");
+  assert.match(cursorRow, /\x1b\[48;2;38;139;210m/, "solarized-light accent");
+  assert.ok(!cursorRow.includes("48;2;137;180;250"), "must not fall back to catppuccin");
 });
 
 test("the frame respects the declared height", () => {
