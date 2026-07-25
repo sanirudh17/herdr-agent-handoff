@@ -10,10 +10,25 @@ if (callsFile) fs.appendFileSync(callsFile, JSON.stringify(argv) + "\n");
 const joined = argv.join(" ");
 const fail = process.env.HANDOFF_FAKE_FAIL;
 if (fail && joined.startsWith(fail)) {
-  process.stdout.write(
-    JSON.stringify({ error: { code: "boom", message: `${fail} failed` }, id: "cli:x" }) + "\n"
-  );
-  process.exit(1);
+  const code = process.env.HANDOFF_FAKE_ERROR_CODE || "boom";
+  // Fail only for as many attempts as asked, so a retry can succeed.
+  const limit = Number(process.env.HANDOFF_FAKE_FAIL_TIMES || "0");
+  const countFile = process.env.HANDOFF_FAKE_COUNT;
+  let attempts = 0;
+  if (limit > 0 && countFile) {
+    try {
+      attempts = Number(fs.readFileSync(countFile, "utf8")) || 0;
+    } catch {
+      attempts = 0;
+    }
+    fs.writeFileSync(countFile, String(attempts + 1));
+  }
+  if (limit === 0 || attempts < limit) {
+    process.stdout.write(
+      JSON.stringify({ error: { code, message: `${fail} failed` }, id: "cli:x" }) + "\n"
+    );
+    process.exit(1);
+  }
 }
 
 function ok(result) {

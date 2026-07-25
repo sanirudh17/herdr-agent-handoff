@@ -1,68 +1,140 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const theme = require("../lib/theme.js");
 
-test("named colours become palette indices so the theme maps them", () => {
-  assert.deepEqual(theme.parseAccent("blue"), { kind: "index", index: 4 });
-  assert.deepEqual(theme.parseAccent("cyan"), { kind: "index", index: 6 });
-  assert.deepEqual(theme.parseAccent("bright blue"), { kind: "index", index: 12 });
-  assert.deepEqual(theme.parseAccent("MAGENTA"), { kind: "index", index: 5 });
+function configFile(body) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-theme-"));
+  const file = path.join(dir, "config.toml");
+  fs.writeFileSync(file, body);
+  return file;
+}
+
+test("every theme Herdr offers in its settings modal is known", () => {
+  // The list shown in Herdr's own theme section.
+  for (const name of [
+    "catppuccin", "catppuccin-latte", "terminal", "tokyo-night", "tokyo-night-day",
+    "dracula", "nord", "gruvbox", "gruvbox-light", "one-dark", "one-light",
+    "solarized", "solarized-light", "kanagawa", "kanagawa-lotus", "rose-pine",
+    "rose-pine-dawn", "vesper",
+  ]) {
+    assert.ok(theme.paletteFor(name), `no palette for ${name}`);
+  }
 });
 
-test("hex and rgb accents become truecolour", () => {
-  assert.deepEqual(theme.parseAccent("#89b4fa"), { kind: "rgb", r: 137, g: 180, b: 250 });
-  assert.deepEqual(theme.parseAccent("#abc"), { kind: "rgb", r: 170, g: 187, b: 204 });
-  assert.deepEqual(theme.parseAccent("rgb(1, 2, 3)"), { kind: "rgb", r: 1, g: 2, b: 3 });
+test("upstream aliases resolve to the same palette", () => {
+  assert.deepEqual(theme.paletteFor("catppuccin-mocha"), theme.paletteFor("catppuccin"));
+  assert.deepEqual(theme.paletteFor("tokyonight"), theme.paletteFor("tokyo-night"));
+  assert.deepEqual(theme.paletteFor("solarized-dark"), theme.paletteFor("solarized"));
+  assert.deepEqual(theme.paletteFor("dawn"), theme.paletteFor("rose-pine-dawn"));
+  assert.deepEqual(theme.paletteFor("Tokyo Night"), theme.paletteFor("tokyo-night"));
 });
 
-test("nonsense accents are rejected", () => {
-  assert.equal(theme.parseAccent("mauve-ish"), null);
-  assert.equal(theme.parseAccent(""), null);
-  assert.equal(theme.parseAccent(undefined), null);
+test("unknown themes have no palette", () => {
+  assert.equal(theme.paletteFor("mauve-dream"), null);
+  assert.equal(theme.paletteFor(""), null);
 });
 
-test("accent is read from the [ui] section", () => {
-  const config = ['[theme]', 'name = "catppuccin"', '', '[ui]', 'accent = "magenta"'].join("\n");
-  assert.deepEqual(theme.accentFromConfig(config), { kind: "index", index: 5 });
+test("each palette carries every token the picker styles with", () => {
+  for (const [name, palette] of Object.entries(theme.PALETTES)) {
+    for (const token of ["accent", "panel_bg", "surface0", "surface_dim", "overlay0", "overlay1", "text", "subtext0"]) {
+      assert.ok(palette[token], `${name} is missing ${token}`);
+    }
+  }
 });
 
-test("accent is read from [theme.custom] too", () => {
-  const config = ['[theme.custom]', 'accent = "#89b4fa"'].join("\n");
-  assert.deepEqual(theme.accentFromConfig(config), { kind: "rgb", r: 137, g: 180, b: 250 });
+test("catppuccin resolves to Herdr's own values", () => {
+  const { palette } = theme.resolveTheme(configFile('[theme]\nname = "catppuccin"\n'));
+  assert.deepEqual(palette.accent, { kind: "rgb", r: 137, g: 180, b: 250 });
+  assert.deepEqual(palette.surface0, { kind: "rgb", r: 49, g: 50, b: 68 });
+  assert.deepEqual(palette.panelBg, { kind: "rgb", r: 24, g: 24, b: 37 });
 });
 
-test("commented-out accents are ignored", () => {
-  const config = ['[ui]', '# accent = "red"'].join("\n");
-  assert.equal(theme.accentFromConfig(config), null);
+test("solarized-light resolves to its own values, not catppuccin's", () => {
+  const { palette } = theme.resolveTheme(configFile('[theme]\nname = "solarized-light"\n'));
+  assert.deepEqual(palette.accent, { kind: "rgb", r: 38, g: 139, b: 210 });
+  assert.deepEqual(palette.panelBg, { kind: "rgb", r: 253, g: 246, b: 227 });
 });
 
-test("an accent outside [ui] and [theme.custom] is ignored", () => {
-  const config = ['[ui.toast]', 'accent = "red"'].join("\n");
-  assert.equal(theme.accentFromConfig(config), null);
+test("a missing or unreadable config falls back to the default theme", () => {
+  assert.equal(theme.resolveTheme(null).name, theme.DEFAULT_THEME);
+  assert.equal(theme.resolveTheme("/no/such/config.toml").name, theme.DEFAULT_THEME);
 });
 
-test("with no accent configured the theme's blue slot is used", () => {
-  const config = ['[theme]', 'name = "catppuccin"'].join("\n");
-  assert.equal(theme.accentFromConfig(config), null);
-  assert.deepEqual(theme.resolveAccent(null), { kind: "index", index: theme.DEFAULT_INDEX });
-  assert.equal(theme.DEFAULT_INDEX, 4);
+test("an unknown theme name falls back to the default palette", () => {
+  const { palette } = theme.resolveTheme(configFile('[theme]\nname = "not-a-theme"\n'));
+  assert.deepEqual(palette.accent, { kind: "rgb", r: 137, g: 180, b: 250 });
 });
 
-test("palette indices produce standard SGR colours, not reverse video", () => {
-  const codes = theme.accentCodes({ kind: "index", index: 4 });
-  assert.equal(codes.fg, "\x1b[34m");
-  assert.equal(codes.bg, "\x1b[44m");
-  const bright = theme.accentCodes({ kind: "index", index: 12 });
-  assert.equal(bright.fg, "\x1b[94m");
-  assert.equal(bright.bg, "\x1b[104m");
+test("[theme.custom] overrides the base palette", () => {
+  const { palette } = theme.resolveTheme(
+    configFile('[theme]\nname = "nord"\n\n[theme.custom]\naccent = "#ff0000"\nsurface0 = "rgb(1,2,3)"\n')
+  );
+  assert.deepEqual(palette.accent, { kind: "rgb", r: 255, g: 0, b: 0 });
+  assert.deepEqual(palette.surface0, { kind: "rgb", r: 1, g: 2, b: 3 });
+  // untouched tokens keep nord's values
+  assert.deepEqual(palette.text, { kind: "rgb", r: 236, g: 239, b: 244 });
 });
 
-test("truecolour accents produce 24-bit SGR", () => {
-  const codes = theme.accentCodes({ kind: "rgb", r: 137, g: 180, b: 250 });
-  assert.equal(codes.bg, "\x1b[48;2;137;180;250m");
+test("a legacy [ui] accent still wins", () => {
+  const { palette } = theme.resolveTheme(configFile('[theme]\nname = "nord"\n\n[ui]\naccent = "magenta"\n'));
+  assert.deepEqual(palette.accent, { kind: "index", index: 5 });
 });
 
-test("a missing accent still yields usable codes", () => {
-  const codes = theme.accentCodes(undefined);
-  assert.equal(codes.bg, "\x1b[44m");
+test("commented-out settings are ignored", () => {
+  const { palette } = theme.resolveTheme(configFile('[theme]\n# name = "dracula"\n'));
+  assert.deepEqual(palette.accent, { kind: "rgb", r: 137, g: 180, b: 250 });
+});
+
+test("the terminal theme defers to the host palette", () => {
+  const { palette } = theme.resolveTheme(configFile('[theme]\nname = "terminal"\n'));
+  assert.deepEqual(palette.accent, { kind: "index", index: 4 });
+  assert.deepEqual(palette.panelBg, { kind: "reset" });
+  assert.deepEqual(palette.text, { kind: "reset" });
+});
+
+test("accent fills use the panel background as their foreground, as Herdr does", () => {
+  const nord = theme.resolveTheme(configFile('[theme]\nname = "nord"\n'));
+  assert.deepEqual(theme.contrastFg(nord.palette), nord.palette.panelBg);
+
+  // With a Reset panel background there is nothing to contrast against, so Herdr
+  // falls back to surface_dim.
+  const term = theme.resolveTheme(configFile('[theme]\nname = "terminal"\n'));
+  assert.deepEqual(theme.contrastFg(term.palette), term.palette.surfaceDim);
+});
+
+test("styles emit truecolour SGR built from the resolved palette", () => {
+  const s = theme.styles(theme.resolveTheme(configFile('[theme]\nname = "catppuccin"\n')));
+  assert.match(s.activeTab, /\x1b\[48;2;137;180;250m/, "active tab sits on the accent");
+  assert.match(s.activeTab, /\x1b\[38;2;24;24;37m/, "with the panel background as text");
+  assert.match(s.cursorRow, /\x1b\[48;2;49;50;68m/, "cursor row uses surface0, not the accent");
+  assert.match(s.cursorRow, /\x1b\[38;2;205;214;244m/, "with normal text on top");
+  assert.match(s.primaryChip, /\x1b\[48;2;137;180;250m/);
+  assert.match(s.secondaryChip, /\x1b\[48;2;49;50;68m/);
+});
+
+test("the cursor row is never painted in the accent colour", () => {
+  for (const name of Object.keys(theme.THEME_ALIASES)) {
+    const resolved = theme.resolveTheme(configFile(`[theme]\nname = "${name}"\n`));
+    const s = theme.styles(resolved);
+    const accentBg = theme.bg(resolved.palette.accent);
+    assert.ok(
+      !s.cursorRow.includes(accentBg),
+      `${name}: the selected row should use surface0, matching Herdr's settings modal`
+    );
+  }
+});
+
+test("every theme produces a complete, distinct style set", () => {
+  const seen = new Set();
+  for (const name of Object.keys(theme.PALETTES)) {
+    const s = theme.styles({ palette: theme.resolveTheme(null).palette });
+    for (const key of ["activeTab", "cursorRow", "primaryChip", "secondaryChip", "dim", "base"]) {
+      assert.ok(s[key] && s[key].length > 0, `${name} produced no ${key}`);
+    }
+    seen.add(name);
+  }
+  assert.equal(seen.size, 18);
 });

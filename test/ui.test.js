@@ -1,6 +1,19 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const ui = require("../lib/ui.js");
+const themeLib = require("../lib/theme.js");
+
+function configWith(name) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-ui-theme-"));
+  const file = path.join(dir, "config.toml");
+  fs.writeFileSync(file, `[theme]\nname = "${name}"\n`);
+  return file;
+}
+
+const catppuccin = { palette: themeLib.resolveTheme(configWith("catppuccin")).palette };
 
 const INSTALLED = [
   { kind: "claude", name: "Claude Code" },
@@ -97,6 +110,42 @@ test("tab switches between the installed and not-installed sections", () => {
   assert.equal(s.section, "notInstalled");
   ({ state: s } = ui.applyKey(s, "tab"));
   assert.equal(s.section, "installed");
+});
+
+test("right and left arrows move between sections", () => {
+  let s = state();
+  ({ state: s } = ui.applyKey(s, "right"));
+  assert.equal(s.section, "notInstalled", "right arrow should reach the not-installed tab");
+  ({ state: s } = ui.applyKey(s, "left"));
+  assert.equal(s.section, "installed");
+});
+
+test("vim h and l also move between sections", () => {
+  let s = state();
+  ({ state: s } = ui.applyKey(s, "l"));
+  assert.equal(s.section, "notInstalled");
+  ({ state: s } = ui.applyKey(s, "h"));
+  assert.equal(s.section, "installed");
+});
+
+test("clicking a tab label switches to that section", () => {
+  const s = state();
+  const header = ui.renderFrame(s)[0];
+  const col = header.indexOf("not installed");
+  assert.ok(col > 0, `expected a not-installed tab in ${JSON.stringify(header)}`);
+  const out = ui.applyClick(s, 0, col);
+  assert.equal(out.state.section, "notInstalled");
+  assert.equal(out.action, null, "switching sections is not a selection");
+
+  const back = ui.applyClick(out.state, 0, ui.renderFrame(out.state)[0].indexOf("installed"));
+  assert.equal(back.state.section, "installed");
+});
+
+test("clicking empty space in the tab row does nothing", () => {
+  const s = state();
+  const out = ui.applyClick(s, 0, 70);
+  assert.equal(out.state.section, "installed");
+  assert.equal(out.action, null);
 });
 
 test("? jumps to the not-installed section and back", () => {
@@ -218,28 +267,37 @@ test("exactly one row carries the cursor marker", () => {
   assert.match(marked[0], /Claude Code/);
 });
 
-test("styled output paints selected chrome in the theme accent, never reverse video", () => {
-  const frame = ui.renderFrame(state(), { styled: true });
+test("styled output reproduces Herdr's settings-modal styling, never reverse video", () => {
+  const frame = ui.renderFrame(state({ theme: catppuccin }), { styled: true });
   const all = frame.join("\n");
   assert.ok(!all.includes("\x1b[7m"), "reverse video ignores the theme and must not be used");
 
+  // Selected row: surface0 fill with normal text, as Herdr's list highlight does.
   const cursorRow = frame.find((l) => l.includes("Claude Code"));
-  assert.match(cursorRow, /\x1b\[44m/, "cursor row should use the accent background");
-  assert.match(cursorRow, /\x1b\[30m/, "accent fills carry dark text for contrast");
-  assert.match(frame[0], /\x1b\[44m/, "the active section tab should use the accent too");
-  assert.match(frame[0], /\x1b\[2m/, "counter should be dimmed");
-  assert.match(frame[frame.length - 1], /\x1b\[44m/, "the primary chip should use the accent");
+  assert.match(cursorRow, /\x1b\[48;2;49;50;68m/, "cursor row uses surface0");
+  assert.match(cursorRow, /\x1b\[38;2;205;214;244m/, "cursor row uses normal text");
+
+  // Active tab and primary chip: accent fill with the panel background as text.
+  assert.match(frame[0], /\x1b\[48;2;137;180;250m/, "active tab uses the accent");
+  assert.match(frame[0], /\x1b\[38;2;24;24;37m/, "accent fills use panel_bg as text");
+  assert.match(frame[frame.length - 1], /\x1b\[48;2;137;180;250m/, "primary chip uses the accent");
 });
 
-test("a configured accent overrides the default", () => {
-  const magenta = ui.renderFrame(state({ accent: { kind: "index", index: 5 } }), { styled: true });
-  assert.match(magenta.find((l) => l.includes("Claude Code")), /\x1b\[45m/);
-
-  const hex = ui.renderFrame(
-    state({ accent: { kind: "rgb", r: 137, g: 180, b: 250 } }),
-    { styled: true }
+test("the cursor row is never painted in the accent colour", () => {
+  const frame = ui.renderFrame(state({ theme: catppuccin }), { styled: true });
+  const cursorRow = frame.find((l) => l.includes("Claude Code"));
+  assert.ok(
+    !cursorRow.includes("\x1b[48;2;137;180;250m"),
+    "the accent is for tabs and chips; the selected row is a surface"
   );
-  assert.match(hex.find((l) => l.includes("Claude Code")), /\x1b\[48;2;137;180;250m/);
+});
+
+test("a different theme yields different colours", () => {
+  const solarized = { palette: themeLib.resolveTheme(configWith("solarized-light")).palette };
+  const frame = ui.renderFrame(state({ theme: solarized }), { styled: true });
+  const cursorRow = frame.find((l) => l.includes("Claude Code"));
+  assert.match(cursorRow, /\x1b\[48;2;238;232;213m/, "solarized-light surface0");
+  assert.ok(!cursorRow.includes("48;2;49;50;68"), "must not fall back to catppuccin");
 });
 
 test("the frame respects the declared height", () => {

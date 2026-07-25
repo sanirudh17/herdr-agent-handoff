@@ -48,7 +48,7 @@ function buildState(request) {
     destination: request.destination,
     installed: request.installed,
     notInstalled: request.notInstalled || [],
-    accent: request.accent || null,
+    theme: request.theme || null,
     // Use the pane's real size; the frame budgets every column from it so
     // nothing wraps, even in a 34-column popup.
     width: HEADLESS ? 78 : Math.max(24, process.stdout.columns || 78),
@@ -121,7 +121,7 @@ function runInteractive(request) {
     trace(`stdin data ${JSON.stringify(buf.toString("binary"))}`);
     for (const event of ui.decodeInput(buf)) {
       const out = event.type === "mouse"
-        ? ui.applyClick(state, event.row)
+        ? ui.applyClick(state, event.row, event.col)
         : ui.applyKey(state, event.name);
       state = out.state;
       if (out.action && out.action.select) {

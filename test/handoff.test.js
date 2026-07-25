@@ -206,6 +206,41 @@ test("a failed prompt reports the prompt failure", async () => {
   assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
 });
 
+test("the prompt is submitted with a delivery wait, not fire-and-forget", async () => {
+  const { env, calls } = workspace();
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const prompt = readCalls(calls).find((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.ok(prompt.includes("--wait"), "a swallowed prompt must be detectable");
+  assert.ok(prompt.includes("--until"), "and confirmed by an observed state change");
+});
+
+test("a stalled submission is retried, because nothing reached the agent", async () => {
+  const { env, calls, home } = workspace();
+  // Herdr reports agent_prompt_stalled when no state change follows submission —
+  // exactly what happens when an agent's TUI swallows text while still painting.
+  env.HANDOFF_FAKE_FAIL = "agent prompt";
+  env.HANDOFF_FAKE_ERROR_CODE = "agent_prompt_stalled";
+  env.HANDOFF_FAKE_FAIL_TIMES = "1";
+  env.HANDOFF_FAKE_COUNT = path.join(home, "attempts.txt");
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true, "the retry should land the handoff");
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 2, "stalled once, retried once");
+});
+
+test("a slow first turn counts as delivered rather than failed", async () => {
+  const { env, calls } = workspace();
+  // `timeout` means the agent did change state but had not reached "working" yet:
+  // the text landed.
+  env.HANDOFF_FAKE_FAIL = "agent prompt";
+  env.HANDOFF_FAKE_ERROR_CODE = "timeout";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true);
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 1, "no retry: the prompt was not swallowed");
+});
+
 test("only installed agents are offered to the picker", async () => {
   const { env } = workspace();
   const out = await run({ destination: "tab", env, dryRun: true });
