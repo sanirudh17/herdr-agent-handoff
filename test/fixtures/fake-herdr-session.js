@@ -24,7 +24,8 @@ if (fail && joined.startsWith(fail)) {
     fs.writeFileSync(countFile, String(attempts + 1));
   }
   if (limit === 0 || attempts < limit) {
-    process.stdout.write(
+    // stderr, as Herdr does.
+    process.stderr.write(
       JSON.stringify({ error: { code, message: `${fail} failed` }, id: "cli:x" }) + "\n"
     );
     process.exit(1);
@@ -115,6 +116,32 @@ if (argv[0] === "pane" && argv[1] === "process-info") {
 if (argv[0] === "pane" && argv[1] === "run") process.exit(0);
 if (argv[0] === "agent" && argv[1] === "wait") ok({ type: "agent_info", agent: { agent_status: "idle" } });
 if (argv[0] === "agent" && argv[1] === "rename") ok({ type: "agent_info", agent: { name: argv[3] } });
+
+// The agent record the delivery check reads. HANDOFF_FAKE_REACTS decides whether
+// the agent appears to react to a prompt: "never" models an agent whose TUI
+// swallows input while it is still starting up.
+if (argv[0] === "agent" && argv[1] === "get") {
+  const reacts = process.env.HANDOFF_FAKE_REACTS !== "never";
+  const countFile = process.env.HANDOFF_FAKE_GET_COUNT;
+  let seq = 0;
+  if (countFile) {
+    try {
+      seq = Number(fs.readFileSync(countFile, "utf8")) || 0;
+    } catch {
+      seq = 0;
+    }
+    fs.writeFileSync(countFile, String(seq + 1));
+  }
+  ok({
+    type: "agent_info",
+    agent: {
+      terminal_id: "t2", workspace_id: "w5", tab_id: "w5:t1", pane_id: argv[2],
+      focused: false, revision: 1, agent: agent || "claude",
+      agent_status: reacts && seq > 0 ? "working" : "idle",
+      state_change_seq: reacts ? seq : 0,
+    },
+  });
+}
 
 if (argv[0] === "agent" && argv[1] === "prompt") ok({ type: "agent_prompted" });
 

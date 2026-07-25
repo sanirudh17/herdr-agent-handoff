@@ -35,6 +35,12 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_FAKE_CALLS: calls,
     HANDOFF_FAKE_AGENT: agent,
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
+    // Real delivery backoff spans about a minute; the tests should not.
+    HANDOFF_SETTLE_MS: "0",
+    HANDOFF_CONFIRM_WINDOW_MS: "150",
+    HANDOFF_RETRY_BACKOFF_MS: "0,0,0",
+    // By default the fake agent reacts to a prompt, as a healthy one would.
+    HANDOFF_FAKE_GET_COUNT: path.join(home, "agent-get-count.txt"),
     HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
       focused_pane_id: "w5:p1", workspace_id: "w5", tab_id: "w5:t1",
       workspace_label: "Herdr", tab_label: "1",
@@ -201,6 +207,7 @@ test("a failed pane-shell launch reports and does not prompt", async () => {
 test("a failed prompt reports the prompt failure", async () => {
   const { env } = workspace();
   env.HANDOFF_FAKE_FAIL = "agent prompt";
+  env.HANDOFF_FAKE_REACTS = "never"; // the agent never stirs, so nothing landed
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
@@ -214,31 +221,42 @@ test("the prompt is submitted with a delivery wait, not fire-and-forget", async 
   assert.ok(prompt.includes("--until"), "and confirmed by an observed state change");
 });
 
-test("a stalled submission is retried, because nothing reached the agent", async () => {
+test("a swallowed prompt is retried until the agent finally reacts", async () => {
   const { env, calls, home } = workspace();
-  // Herdr reports agent_prompt_stalled when no state change follows submission —
-  // exactly what happens when an agent's TUI swallows text while still painting.
+  // An agent still painting its TUI swallows the text and never stirs. Only then
+  // is a retry safe, because nothing landed and nothing can be duplicated.
   env.HANDOFF_FAKE_FAIL = "agent prompt";
   env.HANDOFF_FAKE_ERROR_CODE = "agent_prompt_stalled";
   env.HANDOFF_FAKE_FAIL_TIMES = "1";
   env.HANDOFF_FAKE_COUNT = path.join(home, "attempts.txt");
+  env.HANDOFF_FAKE_REACTS = "never";
 
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, true, "the retry should land the handoff");
   const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 2, "stalled once, retried once");
+  assert.equal(prompts.length, 2, "swallowed once, retried once");
 });
 
-test("a slow first turn counts as delivered rather than failed", async () => {
+test("a wait that reports failure is overruled by the agent actually reacting", async () => {
   const { env, calls } = workspace();
-  // `timeout` means the agent did change state but had not reached "working" yet:
-  // the text landed.
+  // This is the false negative that reported "did not accept the handoff" while
+  // pi was visibly working: the wait errored, but the agent had reacted.
   env.HANDOFF_FAKE_FAIL = "agent prompt";
   env.HANDOFF_FAKE_ERROR_CODE = "timeout";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  assert.equal(out.ok, true);
+  assert.equal(out.ok, true, "a reacting agent means the prompt was delivered");
   const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 1, "no retry: the prompt was not swallowed");
+  assert.equal(prompts.length, 1, "no retry: the text was not swallowed");
+});
+
+test("delivery is confirmed against the agent, not just the submit call", async () => {
+  const { env, calls } = workspace();
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(
+    argv.some((a) => a.startsWith("agent get w5:p2")),
+    "the target's own state is the proof of delivery"
+  );
 });
 
 test("only installed agents are offered to the picker", async () => {

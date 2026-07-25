@@ -49,6 +49,26 @@ test("briefing forbids writing to the handoff directory and touching the source"
   assert.match(text, /do not/i);
 });
 
+test("briefing opens with an ordered set of actions, not a wall of rules", () => {
+  const text = render({ snapshot: SNAPSHOT, meta: META });
+  const doThis = text.indexOf("Do this, in this order");
+  const rules = text.indexOf("The rules");
+  assert.ok(doThis > 0, "the target needs concrete first actions");
+  assert.ok(doThis < rules, "actions should come before the rules");
+});
+
+test("briefing forbids the status report agents default to", () => {
+  const text = render({ snapshot: SNAPSHOT, meta: META });
+  assert.match(text, /Do not write a report/i);
+  assert.match(text, /one or two lines/i);
+  assert.match(text, /handoff \*is\* the instruction|do not wait for a fresh instruction/i);
+});
+
+test("briefing says what to do when the task was already finished", () => {
+  const text = render({ snapshot: SNAPSHOT, meta: META });
+  assert.match(text, /already finished/i);
+});
+
 test("briefing covers non-coding work explicitly", () => {
   const text = render({ snapshot: SNAPSHOT, meta: META });
   assert.match(text, /notes|artifacts|conversation/i);

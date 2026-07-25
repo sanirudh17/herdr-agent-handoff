@@ -3,8 +3,10 @@
 
 const args = process.argv.slice(2);
 
+// Herdr writes error envelopes to stderr, not stdout. Reproduced faithfully:
+// a fixture that answered on stdout hid a real bug for several rounds.
 if (args[0] === "fail-envelope") {
-  process.stdout.write(
+  process.stderr.write(
     JSON.stringify({ error: { code: "pane_not_found", message: "pane w99:p99 not found" }, id: "cli:pane:get" }) + "\n"
   );
   process.exit(1);
