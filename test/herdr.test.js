@@ -48,6 +48,18 @@ test("run with json:false returns raw stdout", () => {
   assert.match(out, /^Config: /);
 });
 
+// Not every Herdr command answers with a JSON envelope. `agent read` prints the
+// screen as plain text and `pane run` prints nothing at all; asking either for
+// JSON throws. That mistake, made against `agent read`, silently disabled the
+// delivery check for every handoff.
+test("a plain-text command throws when JSON is demanded, so callers must opt out", () => {
+  assert.throws(
+    () => run([FAKE, "plain"], { env: fakeEnv }),
+    /returned no JSON result/,
+    "demanding JSON from a text command must fail loudly, not return empty"
+  );
+});
+
 test("run throws when the binary cannot be executed", () => {
   assert.throws(
     () => run(["x"], { env: { HERDR_BIN_PATH: path.join(__dirname, "no-such-binary-xyz") } }),

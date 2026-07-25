@@ -170,8 +170,12 @@ if (argv[0] === "agent" && argv[1] === "read") {
       text = "";
     }
   }
+  // `herdr agent read` prints the screen as PLAIN TEXT — no JSON envelope. A
+  // fixture that answered with JSON is exactly why the broken read passed every
+  // test while never once working against the real CLI.
   // HANDOFF_FAKE_SCREEN prepends fixed screen content, e.g. a trust dialog.
-  ok({ type: "pane_read", text: (process.env.HANDOFF_FAKE_SCREEN || "") + " " + text });
+  process.stdout.write((process.env.HANDOFF_FAKE_SCREEN || "") + " " + text + "\n");
+  process.exit(0);
 }
 
 if (argv[0] === "agent" && argv[1] === "prompt") ok({ type: "agent_prompted" });
