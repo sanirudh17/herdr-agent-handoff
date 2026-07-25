@@ -218,11 +218,28 @@ test("exactly one row carries the cursor marker", () => {
   assert.match(marked[0], /Claude Code/);
 });
 
-test("styled output highlights the cursor row and dims the counter", () => {
+test("styled output paints selected chrome in the theme accent, never reverse video", () => {
   const frame = ui.renderFrame(state(), { styled: true });
+  const all = frame.join("\n");
+  assert.ok(!all.includes("\x1b[7m"), "reverse video ignores the theme and must not be used");
+
   const cursorRow = frame.find((l) => l.includes("Claude Code"));
-  assert.match(cursorRow, /\x1b\[7m/, "cursor row should use a highlight bar");
+  assert.match(cursorRow, /\x1b\[44m/, "cursor row should use the accent background");
+  assert.match(cursorRow, /\x1b\[30m/, "accent fills carry dark text for contrast");
+  assert.match(frame[0], /\x1b\[44m/, "the active section tab should use the accent too");
   assert.match(frame[0], /\x1b\[2m/, "counter should be dimmed");
+  assert.match(frame[frame.length - 1], /\x1b\[44m/, "the primary chip should use the accent");
+});
+
+test("a configured accent overrides the default", () => {
+  const magenta = ui.renderFrame(state({ accent: { kind: "index", index: 5 } }), { styled: true });
+  assert.match(magenta.find((l) => l.includes("Claude Code")), /\x1b\[45m/);
+
+  const hex = ui.renderFrame(
+    state({ accent: { kind: "rgb", r: 137, g: 180, b: 250 } }),
+    { styled: true }
+  );
+  assert.match(hex.find((l) => l.includes("Claude Code")), /\x1b\[48;2;137;180;250m/);
 });
 
 test("the frame respects the declared height", () => {

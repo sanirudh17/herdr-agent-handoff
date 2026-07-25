@@ -80,7 +80,24 @@ if (argv[0] === "agent" && argv[1] === "start") {
   });
 }
 
-if (argv[0] === "pane" && argv[1] === "run") ok({ type: "ok" });
+// A shell sitting at its prompt still reports itself as the foreground process
+// on Windows, with pid == shell_pid. Reproducing that here rather than an empty
+// list keeps the readiness check honest.
+if (argv[0] === "pane" && argv[1] === "process-info") {
+  ok({
+    type: "pane_process_info",
+    process_info: {
+      pane_id: argv[3],
+      shell_pid: 4242,
+      foreground_process_group_id: 4242,
+      foreground_processes: [{ pid: 4242, name: "powershell.exe" }],
+    },
+  });
+}
+
+// `herdr pane run` goes through send_ok_request: exit 0 and NOT a byte of
+// stdout. Anything expecting a JSON envelope from it breaks.
+if (argv[0] === "pane" && argv[1] === "run") process.exit(0);
 if (argv[0] === "agent" && argv[1] === "wait") ok({ type: "agent_info", agent: { agent_status: "idle" } });
 if (argv[0] === "agent" && argv[1] === "rename") ok({ type: "agent_info", agent: { name: argv[3] } });
 

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { run, MESSAGES } = require("../lib/handoff.js");
+const { run, MESSAGES, shellIsAtPrompt } = require("../lib/handoff.js");
 
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
@@ -233,6 +233,26 @@ test("the picker request carries the not-installed roster so it can be browsed",
   const out = await run({ destination: "tab", env, dryRun: true });
   assert.ok(out.request.notInstalled.every((a) => a.kind && a.name));
   assert.ok(out.request.notInstalled.some((a) => a.kind === "gemini"));
+});
+
+test("a shell listing only itself in the foreground is at its prompt", () => {
+  // Windows reports the shell as its own foreground process; an empty list is
+  // the POSIX shape. Both mean ready.
+  assert.equal(
+    shellIsAtPrompt({ shell_pid: 100, foreground_processes: [{ pid: 100, name: "powershell.exe" }] }),
+    true
+  );
+  assert.equal(shellIsAtPrompt({ shell_pid: 100, foreground_processes: [] }), true);
+  assert.equal(shellIsAtPrompt({ shell_pid: 100 }), true);
+});
+
+test("a shell running something else is not at its prompt", () => {
+  assert.equal(
+    shellIsAtPrompt({ shell_pid: 100, foreground_processes: [{ pid: 777, name: "node.exe" }] }),
+    false
+  );
+  assert.equal(shellIsAtPrompt({}), false);
+  assert.equal(shellIsAtPrompt(null), false);
 });
 
 test("agent start is used where it works", async () => {
