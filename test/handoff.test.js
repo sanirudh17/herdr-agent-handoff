@@ -37,7 +37,7 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
     // Real delivery backoff spans about a minute; the tests should not.
     HANDOFF_SETTLE_MS: "0",
-    HANDOFF_QUIET_MS: "0",
+    HANDOFF_STILL_MS: "0",
     HANDOFF_READY_CAP_MS: "0",
     HANDOFF_CONFIRM_WINDOW_MS: "300",
     // By default the fake agent reacts to a prompt, as a healthy one would.
@@ -233,25 +233,24 @@ test("a confirmed prompt is submitted only once", async () => {
   assert.equal(prompts.length, 1, "confirmation stops the loop immediately");
 });
 
-test("a dropped prompt is retried until it appears", async () => {
-  // Antigravity discards input until it has finished signing in, so the first
-  // submissions vanish and a later one lands.
-  const { env, calls } = workspace();
-  env.HANDOFF_FAKE_SWALLOW_FIRST = "2";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
-  assert.equal(out.ok, true);
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 3, "dropped twice, landed on the third");
-});
-
-test("retries stop at the attempt limit and report honestly", async () => {
+test("the handoff is never sent more than once", async () => {
+  // Antigravity buffers sends made while it finishes signing in and flushes them
+  // together: six retries put five copies of the same handoff into it. Whatever
+  // the outcome, it goes out once.
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_REACTS = "never";
-  env.HANDOFF_DELIVERY_ATTEMPTS = "3";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
   assert.equal(out.ok, false, "unconfirmed delivery is never reported as success");
   const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 3, "bounded, not endless");
+  assert.equal(prompts.length, 1, "one submission, so the task cannot be handed over twice");
+});
+
+test("readiness is judged from the target's screen, not its reported state", async () => {
+  const { env, calls } = workspace();
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  const reads = argv.filter((a) => a.startsWith("agent read w5:p2"));
+  assert.ok(reads.length > 0, "the target's screen is what gates the submission");
 });
 
 test("a state change alone is never treated as delivery", async () => {
