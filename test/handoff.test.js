@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { run, MESSAGES, shellIsAtPrompt, startingUp } = require("../lib/handoff.js");
+const { run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer } = require("../lib/handoff.js");
 
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
@@ -335,6 +335,42 @@ test("an ordinary agent prompt counts as ready", () => {
   assert.equal(startingUp("⠹ Working... 3%/272k · $0.04"), false);
   assert.equal(startingUp(""), false);
   assert.equal(startingUp(null), false);
+});
+
+test("a question on screen is recognised as needing the user, not as slowness", () => {
+  // Antigravity's first run in a directory opens a folder-trust gate.
+  assert.equal(needsAnswer("Do you trust the files in this folder?"), true);
+  assert.equal(needsAnswer("  requesting permission for: write  "), true);
+  assert.equal(needsAnswer("Continue? [y/N]"), true);
+  assert.equal(needsAnswer("1. Yes, proceed  2. No"), true);
+});
+
+test("an ordinary prompt is not mistaken for a question", () => {
+  assert.equal(needsAnswer("> \n? for shortcuts"), false);
+  assert.equal(needsAnswer("⠹ Working..."), false);
+  assert.equal(needsAnswer(null), false);
+});
+
+test("a target waiting on the user is never typed into", async () => {
+  const { env, calls } = workspace();
+  // A trust gate on screen, and Herdr reporting it blocked.
+  env.HANDOFF_FAKE_SCREEN = "Do you trust the files in this folder? 1. Yes 2. No";
+  env.HANDOFF_FAKE_STATUS = "blocked";
+  env.HANDOFF_READY_CAP_MS = "600";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, false);
+  assert.equal(out.needsAttention, true);
+  assert.equal(out.message, MESSAGES.needsAttention("Antigravity CLI"));
+
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 0, "typing into a trust dialog could answer it — never do it");
+});
+
+test("the message for a waiting target says nothing was typed", () => {
+  const m = MESSAGES.needsAttention("Antigravity CLI");
+  assert.match(m, /asking you something/i);
+  assert.match(m, /nothing was typed/i);
 });
 
 test("a slow-starting target is announced instead of leaving a silent pane", () => {

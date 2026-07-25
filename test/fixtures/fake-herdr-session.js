@@ -140,7 +140,9 @@ if (argv[0] === "agent" && argv[1] === "get") {
     agent: {
       terminal_id: "t2", workspace_id: "w5", tab_id: "w5:t1", pane_id: argv[2],
       focused: false, revision: 1, agent: agent || "claude",
-      agent_status: stirs && seq > 0 ? "working" : "idle",
+      // HANDOFF_FAKE_STATUS pins the reported state, e.g. "blocked" for an agent
+      // sitting on a permission or trust prompt.
+      agent_status: process.env.HANDOFF_FAKE_STATUS || (stirs && seq > 0 ? "working" : "idle"),
       state_change_seq: seq,
     },
   });
@@ -168,7 +170,8 @@ if (argv[0] === "agent" && argv[1] === "read") {
       text = "";
     }
   }
-  ok({ type: "pane_read", text });
+  // HANDOFF_FAKE_SCREEN prepends fixed screen content, e.g. a trust dialog.
+  ok({ type: "pane_read", text: (process.env.HANDOFF_FAKE_SCREEN || "") + " " + text });
 }
 
 if (argv[0] === "agent" && argv[1] === "prompt") ok({ type: "agent_prompted" });
