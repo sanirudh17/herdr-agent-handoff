@@ -80,6 +80,10 @@ if (argv[0] === "agent" && argv[1] === "start") {
   });
 }
 
+if (argv[0] === "pane" && argv[1] === "run") ok({ type: "ok" });
+if (argv[0] === "agent" && argv[1] === "wait") ok({ type: "agent_info", agent: { agent_status: "idle" } });
+if (argv[0] === "agent" && argv[1] === "rename") ok({ type: "agent_info", agent: { name: argv[3] } });
+
 if (argv[0] === "agent" && argv[1] === "prompt") ok({ type: "agent_prompted" });
 
 if (argv[0] === "agent" && argv[1] === "focus") {

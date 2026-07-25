@@ -7,6 +7,8 @@ const ipc = require("../lib/ipc.js");
 const ui = require("../lib/ui.js");
 
 const HEADLESS = process.env.HANDOFF_PICKER_HEADLESS === "1";
+// How long the chosen agent stays on screen before the popup closes.
+const CONFIRM_MS = HEADLESS ? 0 : 450;
 
 // The picker runs inside a popup pane whose terminal disappears the moment the
 // process ends, taking any stderr with it. Without this trace a crash in here is
@@ -42,13 +44,14 @@ function loadRequest() {
 
 function buildState(request) {
   return ui.initialState({
-    title: "Handoff to Agent",
     contextLine: request.contextLine,
-    available: request.available,
-    unavailable: request.unavailable || [],
-    unavailableCount: request.unavailableCount || 0,
-    width: HEADLESS ? 78 : Math.max(40, process.stdout.columns || 78),
-    height: HEADLESS ? 20 : Math.max(12, process.stdout.rows || 20),
+    destination: request.destination,
+    installed: request.installed,
+    notInstalled: request.notInstalled || [],
+    // Use the pane's real size; the frame budgets every column from it so
+    // nothing wraps, even in a 34-column popup.
+    width: HEADLESS ? 78 : Math.max(24, process.stdout.columns || 78),
+    height: HEADLESS ? 20 : Math.max(10, process.stdout.rows || 20),
   });
 }
 
@@ -56,8 +59,9 @@ function drawHeadless(state) {
   process.stdout.write(ui.renderFrame(state).join("\n") + "\n\f");
 }
 
-function draw(state) {
-  process.stdout.write("\x1b[H\x1b[2J" + ui.renderFrame(state).join("\r\n"));
+function draw(state, frame) {
+  const lines = frame || ui.renderFrame(state, { styled: true });
+  process.stdout.write("\x1b[H\x1b[2J" + lines.join("\r\n"));
 }
 
 function finish(resultPath, payload, teardown) {
@@ -120,7 +124,13 @@ function runInteractive(request) {
         : ui.applyKey(state, event.name);
       state = out.state;
       if (out.action && out.action.select) {
-        finish(request.resultPath, { selected: out.action.select }, teardown);
+        // Show the choice before the popup disappears, so the selection is
+        // acknowledged rather than the modal just blinking out.
+        draw(state, ui.renderChosenFrame(state, { styled: true }));
+        setTimeout(
+          () => finish(request.resultPath, { selected: out.action.select }, teardown),
+          CONFIRM_MS
+        );
         return;
       }
       if (out.action && out.action.cancel) {
@@ -172,7 +182,7 @@ function main() {
     return;
   }
 
-  trace(`request loaded, ${loaded.request.available.length} agents available`);
+  trace(`request loaded, ${loaded.request.installed.length} agents available`);
   if (HEADLESS) runHeadless(loaded.request);
   else runInteractive(loaded.request);
 }

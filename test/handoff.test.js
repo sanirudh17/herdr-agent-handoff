@@ -37,6 +37,7 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
     HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
       focused_pane_id: "w5:p1", workspace_id: "w5", tab_id: "w5:t1",
+      workspace_label: "Herdr", tab_label: "1",
       focused_pane_agent: agent, focused_pane_cwd: home,
     }),
     HANDOFF_TEST_HOME: home,
@@ -110,6 +111,7 @@ test("cancelling the picker leaves nothing created and reports nothing", async (
 
 test("split handoff splits beside the source, starts, prompts, focuses and notifies", async () => {
   const { env, calls } = workspace();
+  env.HANDOFF_AGENT_START = "native"; // pin the launch strategy; order is what matters here
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: pi → Claude Code (split)");
@@ -149,6 +151,10 @@ test("the source pane is only ever read", async () => {
     assert.ok(!text.startsWith("pane send-keys"), "must never send keys to a pane");
     assert.ok(!text.startsWith("pane close"), "must never close a pane");
     assert.ok(!text.startsWith("pane read"), "must never read scrollback");
+    assert.ok(
+      !(text.startsWith("pane run") && text.includes("w5:p1")),
+      "must never run a command in the source pane"
+    );
   }
 });
 
@@ -174,7 +180,18 @@ test("a failed target creation reports and creates no agent", async () => {
 
 test("a failed agent start reports and does not prompt", async () => {
   const { env, calls } = workspace();
+  env.HANDOFF_AGENT_START = "native";
   env.HANDOFF_FAKE_FAIL = "agent start";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false);
+  assert.equal(out.message, MESSAGES.startFailed("Claude Code"));
+  assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"));
+});
+
+test("a failed pane-shell launch reports and does not prompt", async () => {
+  const { env, calls } = workspace();
+  env.HANDOFF_AGENT_START = "pane-run";
+  env.HANDOFF_FAKE_FAIL = "pane run";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.startFailed("Claude Code"));
@@ -192,7 +209,64 @@ test("a failed prompt reports the prompt failure", async () => {
 test("only installed agents are offered to the picker", async () => {
   const { env } = workspace();
   const out = await run({ destination: "tab", env, dryRun: true });
-  assert.deepEqual(out.request.available.map((a) => a.kind).sort(), ["claude", "codex", "pi"]);
-  assert.equal(out.request.unavailableCount, 18);
-  assert.equal(out.request.available.find((a) => a.kind === "pi").isSource, true);
+  assert.deepEqual(out.request.installed.map((a) => a.kind).sort(), ["claude", "codex", "pi"]);
+  assert.equal(out.request.notInstalled.length, 18);
+  assert.equal(out.request.installed.find((a) => a.kind === "pi").isSource, true);
+});
+
+test("the picker request describes places by label, never by raw id", async () => {
+  const { env } = workspace();
+  const split = await run({ destination: "split", env, dryRun: true });
+  assert.match(split.request.contextLine, /^pi in Herdr · tab 1/);
+  assert.equal(split.request.destination, "split beside it");
+
+  const tab = await run({ destination: "tab", env, dryRun: true });
+  assert.equal(tab.request.destination, "new tab in Herdr");
+
+  for (const text of [split.request.contextLine, split.request.destination, tab.request.destination]) {
+    assert.ok(!/w\d+:[pt]\d+/.test(text), `raw id leaked into "${text}"`);
+  }
+});
+
+test("the picker request carries the not-installed roster so it can be browsed", async () => {
+  const { env } = workspace();
+  const out = await run({ destination: "tab", env, dryRun: true });
+  assert.ok(out.request.notInstalled.every((a) => a.kind && a.name));
+  assert.ok(out.request.notInstalled.some((a) => a.kind === "gemini"));
+});
+
+test("agent start is used where it works", async () => {
+  const { env, calls } = workspace();
+  env.HANDOFF_AGENT_START = "native";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true);
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(argv.some((a) => a.startsWith("agent start")), "should use the documented path");
+  assert.ok(!argv.some((a) => a.startsWith("pane run")), "no need for the workaround");
+});
+
+test("the Windows workaround launches the agent through the pane shell", async () => {
+  const { env, calls } = workspace();
+  env.HANDOFF_AGENT_START = "pane-run";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true);
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(
+    !argv.some((a) => a.startsWith("agent start")),
+    "agent start renders an empty -ArgumentList on Windows and must be avoided"
+  );
+  assert.ok(argv.some((a) => a === "pane run w5:p2 claude"), `got ${JSON.stringify(argv)}`);
+  assert.ok(argv.some((a) => a.startsWith("agent wait w5:p2")), "must wait for readiness");
+  assert.ok(argv.some((a) => a.startsWith("agent prompt w5:p2")), "prompt addresses the pane");
+});
+
+test("the workaround uses the executable name that actually resolved", async () => {
+  const { env, home, calls } = workspace();
+  env.HANDOFF_AGENT_START = "pane-run";
+  // cursor resolves as cursor-agent, not cursor.
+  fs.writeFileSync(path.join(home, "bin", "cursor-agent"), "#!/bin/sh\n", { mode: 0o755 });
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "cursor" } });
+  assert.equal(out.ok, true);
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(argv.some((a) => a === "pane run w5:p2 cursor-agent"), `got ${JSON.stringify(argv)}`);
 });

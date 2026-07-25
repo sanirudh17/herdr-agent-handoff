@@ -32,7 +32,10 @@ title = "Handoff to Agent"
 description = "Choose the agent to hand off to"
 placement = "popup"
 width = "70%"
-height = "70%"
+# Sized to hug the roster: six rows of chrome plus room for all 21 agent kinds in
+# the not-installed section, without leaving a screenful of dead space for the
+# handful that are usually installed.
+height = "60%"
 # Launched via `node -e` rather than `node bin/picker.js` on purpose.
 #
 # Herdr sets a plugin pane's cwd to the plugin root as a Windows verbatim path

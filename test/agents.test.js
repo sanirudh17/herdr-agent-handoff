@@ -75,6 +75,20 @@ test("resolveExecutable returns null when nothing matches", () => {
   assert.equal(agents.resolveExecutable("claude", { PATH: dir, PATHEXT: "" }), null);
 });
 
+test("available reflects the filesystem on every call, not a stale cache", () => {
+  const dir = tempPathDir(["claude"]);
+  const env = { PATH: dir, PATHEXT: "" };
+  assert.deepEqual(agents.available(env).map((a) => a.kind), ["claude"]);
+  fs.writeFileSync(path.join(dir, "cursor-agent"), "#!/bin/sh\n", { mode: 0o755 });
+  assert.deepEqual(agents.available(env).map((a) => a.kind).sort(), ["claude", "cursor"]);
+});
+
+test("available reports which executable candidate resolved", () => {
+  const dir = tempPathDir(["cursor-agent"]);
+  const cursor = agents.available({ PATH: dir, PATHEXT: "" }).find((a) => a.kind === "cursor");
+  assert.equal(cursor.execName, "cursor-agent");
+});
+
 test("available reports only agents whose executable resolves, first candidate wins", () => {
   const dir = tempPathDir(["claude", "cursor-agent"]);
   const list = agents.available({ PATH: dir, PATHEXT: "" });
