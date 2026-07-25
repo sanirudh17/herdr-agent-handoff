@@ -173,8 +173,25 @@ if (argv[0] === "agent" && argv[1] === "read") {
   // `herdr agent read` prints the screen as PLAIN TEXT — no JSON envelope. A
   // fixture that answered with JSON is exactly why the broken read passed every
   // test while never once working against the real CLI.
+  //
+  // The screen also carries how many prompts have been submitted, so it changes
+  // once the agent has been given one. That models Antigravity and opencode:
+  // compact TUIs that redraw in response to a prompt they never echo back.
+  // HANDOFF_FAKE_FROZEN=1 pins it, for an agent that does nothing at all.
   // HANDOFF_FAKE_SCREEN prepends fixed screen content, e.g. a trust dialog.
-  process.stdout.write((process.env.HANDOFF_FAKE_SCREEN || "") + " " + text + "\n");
+  let submitted = 0;
+  if (callsFile) {
+    try {
+      submitted = fs.readFileSync(callsFile, "utf8").split("\n")
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l))
+        .filter((c) => c[0] === "agent" && c[1] === "prompt" && c[2] === argv[2]).length;
+    } catch {
+      submitted = 0;
+    }
+  }
+  const draw = process.env.HANDOFF_FAKE_FROZEN === "1" ? "" : ` p${submitted}`;
+  process.stdout.write((process.env.HANDOFF_FAKE_SCREEN || "") + " " + text + draw + "\n");
   process.exit(0);
 }
 

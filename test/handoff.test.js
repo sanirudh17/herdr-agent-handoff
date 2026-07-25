@@ -233,12 +233,44 @@ test("a confirmed prompt is submitted only once", async () => {
   assert.equal(prompts.length, 1, "confirmation stops the loop immediately");
 });
 
+test("an agent that redraws without echoing the prompt is still confirmed", async () => {
+  // Antigravity's shape, measured: a 222-character kickoff never becomes visible
+  // in any snapshot source, but its screen changes 365ms after the prompt lands.
+  // opencode is the same. Requiring the echoed text failed both.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never"; // never echoes the prompt
+  env.HANDOFF_FAKE_NO_SEQ = "1";     // and its reported state does not move
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, true, "a target that redraws has plainly received the prompt");
+});
+
+test("an agent that only changes state is confirmed too", async () => {
+  const { env, home } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_FROZEN = "1";                              // screen never moves
+  env.HANDOFF_FAKE_GET_COUNT = path.join(home, "seq.txt");    // but state does
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "opencode" } });
+  assert.equal(out.ok, true);
+});
+
+test("an agent that does nothing at all is still a failure", async () => {
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_FROZEN = "1";
+  env.HANDOFF_FAKE_NO_SEQ = "1";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false, "no echo, no redraw, no state change means nothing arrived");
+  assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
+});
+
 test("the handoff is never sent more than once", async () => {
   // Antigravity buffers sends made while it finishes signing in and flushes them
   // together: six retries put five copies of the same handoff into it. Whatever
   // the outcome, it goes out once.
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_FROZEN = "1";
+  env.HANDOFF_FAKE_NO_SEQ = "1";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
   assert.equal(out.ok, false, "unconfirmed delivery is never reported as success");
   const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
@@ -253,15 +285,18 @@ test("readiness is judged from the target's screen, not its reported state", asy
   assert.ok(reads.length > 0, "the target's screen is what gates the submission");
 });
 
-test("a state change alone is never treated as delivery", async () => {
-  // agy churns through states while signing in. Live, that was mistaken for a
-  // delivered handoff while it sat at an empty prompt.
-  const { env, home } = workspace();
-  env.HANDOFF_FAKE_REACTS = "never"; // nothing on screen
-  env.HANDOFF_FAKE_GET_COUNT = path.join(home, "seq.txt"); // but the state moves
+test("a busy target is waited for, then still handed off", async () => {
+  // Two different situations, deliberately treated differently. A target mid-turn
+  // is only busy: the handoff queues behind that turn, so it is waited for and
+  // then sent. A target asking a question is another matter — see the trust-gate
+  // test — because the Enter after our text could answer it.
+  const { env, calls } = workspace();
+  env.HANDOFF_FAKE_STATUS = "working";
+  env.HANDOFF_READY_CAP_MS = "600";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
-  assert.equal(out.ok, false, "churn is not proof the prompt arrived");
-  assert.equal(out.message, MESSAGES.promptFailed("Antigravity CLI"));
+  assert.equal(out.ok, true);
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 1, "busy is a reason to wait, not to give up");
 });
 
 test("closing the target mid-confirmation is not reported as a failure", async () => {
