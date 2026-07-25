@@ -191,6 +191,24 @@ if (argv[0] === "agent" && argv[1] === "read") {
     }
   }
   const draw = process.env.HANDOFF_FAKE_FROZEN === "1" ? "" : ` p${submitted}`;
+
+  // HANDOFF_FAKE_ECHO_THEN_DROP models Antigravity discarding a prompt it briefly
+  // echoed: the text shows on the first read after submission and is replaced by
+  // startup wording on every read after that.
+  if (process.env.HANDOFF_FAKE_ECHO_THEN_DROP === "1" && submitted > 0) {
+    const seenFile = `${callsFile}.echoes`;
+    let reads = 0;
+    try {
+      reads = Number(fs.readFileSync(seenFile, "utf8")) || 0;
+    } catch {
+      reads = 0;
+    }
+    fs.writeFileSync(seenFile, String(reads + 1));
+    const body = reads === 0 ? text : "Verifying your account... please try again shortly.";
+    process.stdout.write(`${body}${draw}\n`);
+    process.exit(0);
+  }
+
   process.stdout.write((process.env.HANDOFF_FAKE_SCREEN || "") + " " + text + draw + "\n");
   process.exit(0);
 }

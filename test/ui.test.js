@@ -101,6 +101,19 @@ test("hover stays distinguishable from the accent-filled selection", () => {
   assert.equal(bgOf(cursorLine), "\x1b[48;2;137;180;250m", "selection is the accent");
 });
 
+test("every agent row reaches the pane edge, highlighted or not", () => {
+  const s = state({ theme: catppuccin });
+  const frame = ui.renderFrame(s);
+  const rows = frame.slice(HEADER_ROWS_FOR_TEST, HEADER_ROWS_FOR_TEST + INSTALLED.length);
+  for (const [i, row] of rows.entries()) {
+    assert.equal(
+      row.length,
+      78,
+      `row ${i} stops at the text (${row.length} chars), leaving a half-width band`
+    );
+  }
+});
+
 test("hover highlights span the full width, like the cursor row", () => {
   const s = state({ theme: catppuccin });
   const row = ui.renderFrame(s).findIndex((l) => l.includes("Codex"));

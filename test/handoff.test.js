@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer } = require("../lib/handoff.js");
+const {
+  run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer, usable,
+} = require("../lib/handoff.js");
 
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
@@ -40,6 +42,7 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_STILL_MS: "0",
     HANDOFF_READY_CAP_MS: "0",
     HANDOFF_CONFIRM_WINDOW_MS: "300",
+    HANDOFF_PERSIST_MS: "50",
     // By default the fake agent reacts to a prompt, as a healthy one would.
     HANDOFF_FAKE_GET_COUNT: path.join(home, "agent-get-count.txt"),
     HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
@@ -233,34 +236,41 @@ test("a confirmed prompt is submitted only once", async () => {
   assert.equal(prompts.length, 1, "confirmation stops the loop immediately");
 });
 
-test("an agent that redraws without echoing the prompt is still confirmed", async () => {
-  // Antigravity's shape, measured: a 222-character kickoff never becomes visible
-  // in any snapshot source, but its screen changes 365ms after the prompt lands.
-  // opencode is the same. Requiring the echoed text failed both.
+test("a redraw alone is never accepted as delivery", async () => {
+  // Measured on Antigravity: it prints "Verifying your account…" several seconds
+  // after its screen has gone quiet, and that late redraw is indistinguishable
+  // from a reply. Accepting it announced a handoff that had not been delivered —
+  // the worst outcome available here.
   const { env } = workspace();
-  env.HANDOFF_FAKE_REACTS = "never"; // never echoes the prompt
-  env.HANDOFF_FAKE_NO_SEQ = "1";     // and its reported state does not move
+  env.HANDOFF_FAKE_REACTS = "never";  // never echoes the prompt
   const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
-  assert.equal(out.ok, true, "a target that redraws has plainly received the prompt");
+  assert.equal(out.ok, false, "a screen that merely changed proves nothing");
+  assert.equal(out.message, MESSAGES.promptFailed("Antigravity CLI"));
 });
 
-test("an agent that only changes state is confirmed too", async () => {
+test("a state change alone is never accepted as delivery", async () => {
   const { env, home } = workspace();
   env.HANDOFF_FAKE_REACTS = "never";
-  env.HANDOFF_FAKE_FROZEN = "1";                              // screen never moves
-  env.HANDOFF_FAKE_GET_COUNT = path.join(home, "seq.txt");    // but state does
+  env.HANDOFF_FAKE_GET_COUNT = path.join(home, "seq.txt"); // state moves on its own
   const out = await run({ destination: "split", env, pickerChoice: { selected: "opencode" } });
-  assert.equal(out.ok, true);
+  assert.equal(out.ok, false, "a settling agent changes state by itself");
 });
 
-test("an agent that does nothing at all is still a failure", async () => {
+test("a prompt echoed and then discarded is not a delivery", async () => {
+  // Antigravity echoes the text into its input box and drops it if its account
+  // check is still running. The marker showed 117ms after submission and was gone
+  // six seconds later, replaced by "Verifying your account…".
   const { env } = workspace();
-  env.HANDOFF_FAKE_REACTS = "never";
-  env.HANDOFF_FAKE_FROZEN = "1";
-  env.HANDOFF_FAKE_NO_SEQ = "1";
+  env.HANDOFF_FAKE_ECHO_THEN_DROP = "1";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, false, "an echo that does not survive is not acceptance");
+  assert.equal(out.needsAttention, true);
+});
+
+test("delivery is confirmed only by the prompt appearing", async () => {
+  const { env } = workspace();
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  assert.equal(out.ok, false, "no echo, no redraw, no state change means nothing arrived");
-  assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
+  assert.equal(out.ok, true, "the fake echoes the prompt, which is the one accepted proof");
 });
 
 test("the handoff is never sent more than once", async () => {
@@ -372,12 +382,68 @@ test("an ordinary agent prompt counts as ready", () => {
   assert.equal(startingUp(null), false);
 });
 
+test("a blank pane is not a ready agent", () => {
+  // opencode reads 0 characters for its first five seconds while Herdr reports
+  // "idle" throughout. Treating that as a calm, settled agent is what submitted
+  // the handoff into a pane whose TUI had not painted yet.
+  assert.equal(usable(""), false);
+  assert.equal(usable(null), false);
+  assert.equal(usable("> ? for shortcuts"), true);
+});
+
+test("a usage-credit footer is not treated as an agent that cannot run", () => {
+  // Antigravity shows "AI: Out of credits" in its footer while still working
+  // perfectly — it falls back to another allowance. Reading capability off a
+  // status line blocked handoffs to a healthy agent.
+  const footer = "Gemini 3.6 Flash · low · AI: Out of credits";
+  assert.equal(startingUp(footer), false, "a credit footer is not a startup state");
+  assert.equal(needsAnswer(footer), false, "and it is not a question either");
+});
+
+test("a startup notice scrolled into the past no longer means not ready", () => {
+  // Antigravity leaves "Verifying your account…" in its transcript long after it
+  // stops being true. Matching the whole capture left the target permanently
+  // "starting up", and one handoff waited out the full 180s cap before sending.
+  const scrolled =
+    "Verifying your account... please try again shortly. " +
+    "x".repeat(600) +
+    " > ? for shortcuts   Gemini 3.6 Flash · low";
+  assert.equal(startingUp(scrolled), false, "only the current view decides readiness");
+
+  const current = "x".repeat(600) + " Verifying your account... please try again shortly.";
+  assert.equal(startingUp(current), true, "still showing it means still starting");
+});
+
+test("account verification counts as not ready", () => {
+  // Antigravity's first-run wording, which is neither a sign-in nor a question.
+  assert.equal(startingUp("⚠ Verifying your account... Please try again shortly."), true);
+});
+
+test("a target showing a credit footer is still handed off to", async () => {
+  const { env, calls } = workspace();
+  env.HANDOFF_FAKE_SCREEN = "Gemini 3.6 Flash low AI: Out of credits";
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, true, "the footer says nothing about whether it can take work");
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 1);
+});
+
 test("a question on screen is recognised as needing the user, not as slowness", () => {
   // Antigravity's first run in a directory opens a folder-trust gate.
   assert.equal(needsAnswer("Do you trust the files in this folder?"), true);
   assert.equal(needsAnswer("  requesting permission for: write  "), true);
   assert.equal(needsAnswer("Continue? [y/N]"), true);
   assert.equal(needsAnswer("1. Yes, proceed  2. No"), true);
+});
+
+test("a login menu is a question, not a ready agent", () => {
+  // Measured: a fresh Antigravity pane offers "Select login method: > 1. Google
+  // OAuth". A prompt typed into that is taken as a menu choice — it started an
+  // OAuth flow that ended in "token exchange failed".
+  const menu = "Select login method: > 1. Google OAuth 2. Use a Google Cloud project " +
+    "[Use arrow keys to navigate, Enter to select]";
+  assert.equal(needsAnswer(menu), true);
+  assert.equal(needsAnswer("Press any key to go back."), true);
 });
 
 test("an ordinary prompt is not mistaken for a question", () => {
