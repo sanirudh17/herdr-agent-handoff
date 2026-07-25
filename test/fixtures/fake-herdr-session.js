@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+"use strict";
+
+const fs = require("node:fs");
+
+const argv = process.argv.slice(2);
+const callsFile = process.env.HANDOFF_FAKE_CALLS;
+if (callsFile) fs.appendFileSync(callsFile, JSON.stringify(argv) + "\n");
+
+const joined = argv.join(" ");
+const fail = process.env.HANDOFF_FAKE_FAIL;
+if (fail && joined.startsWith(fail)) {
+  process.stdout.write(
+    JSON.stringify({ error: { code: "boom", message: `${fail} failed` }, id: "cli:x" }) + "\n"
+  );
+  process.exit(1);
+}
+
+function ok(result) {
+  process.stdout.write(JSON.stringify({ id: "cli:x", result }) + "\n");
+  process.exit(0);
+}
+
+const agent = process.env.HANDOFF_FAKE_AGENT || "";
+const session = JSON.parse(process.env.HANDOFF_FAKE_SESSION || "null");
+
+if (argv[0] === "pane" && argv[1] === "get") {
+  ok({
+    type: "pane_info",
+    pane: {
+      pane_id: "w5:p1", terminal_id: "t1", workspace_id: "w5", tab_id: "w5:t1",
+      focused: true, agent_status: "idle", revision: 1,
+      agent: agent || null,
+      cwd: process.env.HANDOFF_TEST_HOME || process.cwd(),
+      agent_session: session
+        ? { agent, kind: session.kind, source: `herdr:${agent}`, value: session.value }
+        : null,
+    },
+  });
+}
+
+if (argv[0] === "pane" && argv[1] === "split") {
+  ok({
+    type: "pane_info",
+    pane: {
+      pane_id: "w5:p2", terminal_id: "t2", workspace_id: "w5", tab_id: "w5:t1",
+      focused: false, agent_status: "unknown", revision: 1,
+    },
+  });
+}
+
+if (argv[0] === "tab" && argv[1] === "create") {
+  ok({
+    type: "tab_info",
+    tab: {
+      tab_id: "w5:t2", workspace_id: "w5", number: 2, label: "handoff",
+      focused: false, pane_count: 1, agent_status: "unknown",
+    },
+  });
+}
+
+if (argv[0] === "pane" && argv[1] === "list") {
+  ok({
+    type: "pane_list",
+    panes: [
+      { pane_id: "w5:p1", terminal_id: "t1", workspace_id: "w5", tab_id: "w5:t1", focused: true, agent_status: "idle", revision: 1 },
+      { pane_id: "w5:p9", terminal_id: "t9", workspace_id: "w5", tab_id: "w5:t2", focused: false, agent_status: "unknown", revision: 1 },
+    ],
+  });
+}
+
+if (argv[0] === "agent" && argv[1] === "start") {
+  ok({
+    type: "agent_started",
+    argv: ["claude"],
+    agent: {
+      terminal_id: "t2", agent_status: "idle", workspace_id: "w5", tab_id: "w5:t1",
+      pane_id: "w5:p2", focused: false, revision: 1, name: argv[2],
+    },
+  });
+}
+
+if (argv[0] === "agent" && argv[1] === "prompt") ok({ type: "agent_prompted" });
+
+if (argv[0] === "agent" && argv[1] === "focus") {
+  ok({
+    type: "agent_info",
+    agent: {
+      terminal_id: "t2", agent_status: "idle", workspace_id: "w5", tab_id: "w5:t1",
+      pane_id: "w5:p2", focused: true, revision: 1,
+    },
+  });
+}
+
+if (argv[0] === "notification") ok({ type: "notification_shown" });
+
+if (argv[0] === "plugin") {
+  ok({ type: "plugin_pane_opened", plugin_pane: { plugin_id: "agent-handoff", entrypoint_id: "picker" } });
+}
+
+ok({ type: "unknown" });
