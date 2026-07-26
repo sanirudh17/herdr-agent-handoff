@@ -1,6 +1,11 @@
 # Agent Handoff
 
 [![tests](https://github.com/sanirudh17/herdr-agent-handoff/actions/workflows/test.yml/badge.svg)](https://github.com/sanirudh17/herdr-agent-handoff/actions/workflows/test.yml)
+![herdr 0.7.5+](https://img.shields.io/badge/herdr-0.7.5%2B-8a2be2)
+![platforms: Windows • macOS • Linux](https://img.shields.io/badge/platforms-Windows%20%E2%80%A2%20macOS%20%E2%80%A2%20Linux-informational)
+![live tested: Windows](https://img.shields.io/badge/live%20tested-Windows-brightgreen)
+![node 18+](https://img.shields.io/badge/node-18%2B-5fa04e)
+![license MIT](https://img.shields.io/badge/license-MIT-blue)
 
 A Herdr plugin that transfers an in-progress task from the agent in the active pane to a **fresh
 session of another installed agent**, carrying the complete source session with it. No summary, no
@@ -31,8 +36,15 @@ pi · w5:p1 · 112 lines  →  new tab in workspace 5
 
 ## Requirements
 
-- Herdr 0.7.5 or newer
-- Node.js 18 or newer on `PATH` (Node 22.5+ if you want to hand off *from* opencode)
+| | |
+|---|---|
+| **Herdr** | 0.7.5 or newer (protocol 17). `min_herdr_version` in the manifest is `0.7.5`; check yours with `herdr status`. |
+| **Node.js** | 18 or newer, on `PATH`. Node 22.5+ only if you want to hand off *from* opencode, whose store needs `node:sqlite`. |
+| **Agents** | At least one of the [supported agents](#agent-support) installed and on `PATH`, running in the pane you hand off *from*. One is enough — the source agent is always offered as a target too, as a fresh session of itself. The picker lists only what it actually finds. |
+| **OS** | Windows, macOS or Linux. **Live-tested on Windows**; macOS and Linux run the full suite in CI but have not had a real handoff exercised. See [Platform support](#platform-support). |
+| **Dependencies** | None. Zero runtime and zero build dependencies — plain Node and the `herdr` CLI. |
+
+Nothing needs compiling and nothing is downloaded at install time.
 
 ## Install
 
