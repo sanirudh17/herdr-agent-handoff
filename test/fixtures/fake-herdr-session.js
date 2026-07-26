@@ -40,6 +40,19 @@ function ok(result) {
 const agent = process.env.HANDOFF_FAKE_AGENT || "";
 const session = JSON.parse(process.env.HANDOFF_FAKE_SESSION || "null");
 
+// Has a prompt been submitted to this pane yet? The recorded calls are the only
+// source of truth the fake has.
+function submittedTo(paneId) {
+  if (!callsFile) return false;
+  try {
+    return fs.readFileSync(callsFile, "utf8").split("\n").filter(Boolean)
+      .map((l) => JSON.parse(l))
+      .some((c) => c[0] === "agent" && c[1] === "prompt" && c[2] === paneId);
+  } catch {
+    return false;
+  }
+}
+
 if (argv[0] === "pane" && argv[1] === "get") {
   ok({
     type: "pane_info",
@@ -142,7 +155,11 @@ if (argv[0] === "agent" && argv[1] === "get") {
       focused: false, revision: 1, agent: agent || "claude",
       // HANDOFF_FAKE_STATUS pins the reported state, e.g. "blocked" for an agent
       // sitting on a permission or trust prompt.
-      agent_status: process.env.HANDOFF_FAKE_STATUS || (stirs && seq > 0 ? "working" : "idle"),
+      // HANDOFF_FAKE_BUSY_AFTER_PROMPT=1 models Grok: idle until the prompt is
+      // submitted, working on it afterwards, and never echoing it to screen.
+      agent_status: process.env.HANDOFF_FAKE_BUSY_AFTER_PROMPT === "1"
+        ? (submittedTo(argv[2]) ? "working" : "idle")
+        : process.env.HANDOFF_FAKE_STATUS || (stirs && seq > 0 ? "working" : "idle"),
       state_change_seq: seq,
     },
   });
@@ -160,6 +177,25 @@ if (argv[0] === "agent" && argv[1] === "read") {
     process.exit(0);
   }
   let text = "";
+  // HANDOFF_FAKE_NEEDS_ENTER=1 models Claude Code and Codex: a pasted prompt lands
+  // in the composer as "[Pasted text #1 +74 lines]" and stays there, unsent, until
+  // an Enter arrives. Measured on both.
+  if (process.env.HANDOFF_FAKE_NEEDS_ENTER === "1") {
+    const submitted = callsFile
+      ? fs.readFileSync(callsFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
+      : [];
+    const pasted = submitted.some((c) => c[0] === "agent" && c[1] === "prompt" && c[2] === argv[2]);
+    const entered = submitted.some(
+      (c) => c[0] === "agent" && c[1] === "send-keys" && c[2] === argv[2] && c[3] === "enter"
+    );
+    if (!pasted) process.stdout.write("╭────╮\n│ >  │\n╰────╯\n");
+    else if (!entered) process.stdout.write("╭────────────────────────────╮\n│ > [Pasted text #1 +74 lines]\n╰────────────────────────────╯\n");
+    else {
+      const prompt = submitted.filter((c) => c[0] === "agent" && c[1] === "prompt" && c[2] === argv[2]).pop();
+      process.stdout.write(`${prompt[3]}\n`);
+    }
+    process.exit(0);
+  }
   // HANDOFF_FAKE_SWALLOW_FIRST=n discards the first n submissions, modelling an
   // agent whose input box is not listening yet.
   const swallow = Number(process.env.HANDOFF_FAKE_SWALLOW_FIRST || "0");

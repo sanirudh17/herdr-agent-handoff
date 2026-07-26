@@ -8,6 +8,7 @@ const {
   readScreenForTest, flat, inputLineIndex,
 } = require("../lib/handoff.js");
 const herdr = require("../lib/herdr.js");
+const briefing = require("../lib/briefing.js");
 
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
@@ -321,7 +322,10 @@ test("a prompt echoed and then discarded is not a delivery", async () => {
   env.HANDOFF_FAKE_ECHO_THEN_DROP = "1";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
   assert.equal(out.ok, false, "an echo that does not survive is not acceptance");
-  assert.equal(out.needsAttention, true);
+  // Reported as not-yet-ready rather than as a question: the account check is why
+  // it dropped the prompt, and nothing was asked of the user.
+  assert.equal(out.notReady, true);
+  assert.equal(out.message, MESSAGES.notReady("Antigravity CLI"));
 });
 
 test("delivery is confirmed only by the prompt appearing", async () => {
@@ -724,4 +728,159 @@ test("a small opencode session is inlined and writes nothing at all", { skip: OC
   assert.equal(out.mode, "inline");
   const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
   assert.deepEqual(ours, [], "under budget, opencode gets no exception either");
+});
+
+test("a prompt left unsent in the composer is submitted with one Enter", async () => {
+  // Measured: Claude Code parks a pasted prompt at "[Pasted text #1 +74 lines]" and
+  // Codex at "[Pasted Content 6999 chars]", both idle and still unsent twenty
+  // seconds later. Without this the handoff lands and is reported as a failure.
+  const { env, calls } = workspace();
+  env.HANDOFF_FAKE_NEEDS_ENTER = "1";
+  env.HANDOFF_NUDGE_MS = "50";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true, out.message);
+
+  const argv = readCalls(calls);
+  const enters = argv.filter((c) => c[0] === "agent" && c[1] === "send-keys" && c[3] === "enter");
+  assert.equal(enters.length, 1, "exactly one Enter, never a stream of them");
+  assert.equal(enters[0][2], "w5:p2", "sent to the target, never the source");
+
+  const prompts = argv.filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 1, "the prompt itself is still submitted only once");
+});
+
+test("an agent that submits a pasted prompt itself is never sent an Enter", async () => {
+  // pi does submit on its own. Spending the Enter there would put a stray empty
+  // message into a healthy handoff.
+  const { env, calls } = workspace();
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true, out.message);
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "send-keys"),
+    "no keys are sent when the marker showed up on its own"
+  );
+});
+
+test("the Enter is never spent on a target showing a question", async () => {
+  // Enter on a trust dialog accepts its default. Questions are never typed into,
+  // and that rule outranks getting the handoff delivered.
+  const { env, calls } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_SCREEN = "Do you trust the files in this folder?";
+  env.HANDOFF_NUDGE_MS = "50";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false);
+  assert.equal(out.needsAttention, true);
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "send-keys"),
+    "must not answer the dialog on the user's behalf"
+  );
+});
+
+test("a marker wrapped one character per line is still found", async () => {
+  // A few-column pane wraps mid-word, so the capture reads "- - e n d o f h a n d
+  // o f f". Measured in a narrow split: the prompt had been delivered and the agent
+  // was working on it, and the handoff was reported as a failure anyway.
+  const { env } = workspace();
+  const wrapped = briefing.SENTINEL.split("").join("\n");
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "narrow-")), "s.txt");
+  fs.writeFileSync(file, `${wrapped}\n`);
+
+  env.FAKE_SCREEN_FILE = file;
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true, out.message);
+});
+
+test("a target that never echoes the prompt is confirmed by working on it", async () => {
+  // Measured: Grok truncates a long message in its own transcript to
+  // "You 6:18 PM are taki …" while working on it for minutes. No marker can ever be
+  // found there, and calling that a failure is wrong.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";            // the screen never shows the prompt
+  env.HANDOFF_FAKE_BUSY_AFTER_PROMPT = "1";     // idle before it, working on it after
+  env.HANDOFF_NUDGE_MS = "20";
+  env.HANDOFF_CONFIRM_WINDOW_MS = "100";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true, out.message);
+  assert.equal(out.message, MESSAGES.success("pi", "Claude Code", "split"));
+});
+
+test("a silent idle target is still a failure, not a handoff", async () => {
+  // Busy is the whole basis of that fallback. An agent that shows nothing and does
+  // nothing has not taken the handoff.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_STATUS = "idle";
+  env.HANDOFF_FAKE_NO_SEQ = "1";
+  env.HANDOFF_NUDGE_MS = "20";
+  env.HANDOFF_CONFIRM_WINDOW_MS = "100";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false);
+  assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
+});
+
+test("a busy target that is still signing in is not confirmed by being busy", async () => {
+  // Antigravity churns through states while it signs in. Its screen says so, and
+  // that has to win over the busy fallback or the old false "Handoff started"
+  // comes straight back.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_STATUS = "working";
+  env.HANDOFF_FAKE_SCREEN = "Verifying your account... please try again shortly.";
+  env.HANDOFF_NUDGE_MS = "20";
+  env.HANDOFF_CONFIRM_WINDOW_MS = "100";
+  env.HANDOFF_DELIVERY_ATTEMPTS = "1";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false, "a signing-in agent has not accepted anything");
+});
+
+test("a target already working when the prompt arrives is not confirmed by that", async () => {
+  // The busy fallback accepts only a transition the submission caused. An agent
+  // already busy was busy with something else, which is how "the agent changed
+  // state" used to announce handoffs that had not happened.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_STATUS = "working";   // busy the whole time, before and after
+  env.HANDOFF_NUDGE_MS = "20";
+  env.HANDOFF_CONFIRM_WINDOW_MS = "100";
+  env.HANDOFF_DELIVERY_ATTEMPTS = "1";
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false, "already-busy is not evidence of anything");
+});
+
+test("a banner above the input box explains a failure even though it did not delay one", async () => {
+  // Antigravity draws its input box while "We're finishing verifying your account
+  // eligibility. Please try again shortly." is still above it, then discards
+  // whatever is typed. Readiness reads from the input line down, so that banner
+  // never delays a handoff - but once delivery has failed it is the reason, and the
+  // target deserves the same wait as any other that is still starting up.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_REACTS = "never";
+  env.HANDOFF_FAKE_SCREEN = [
+    "⚠️Verifying your account...",
+    " └ We're finishing verifying your account eligibility.",
+    "   This usually takes a moment. Please try again shortly.",
+    "────────────────",
+    ">",
+    "────────────────",
+    "? for shortcuts",
+  ].join("\n");
+  env.HANDOFF_NUDGE_MS = "20";
+  env.HANDOFF_CONFIRM_WINDOW_MS = "80";
+  env.HANDOFF_DELIVERY_ATTEMPTS = "2";
+
+  // Readiness is not delayed by it: the banner sits above a drawn input line.
+  assert.equal(startingUp(env.HANDOFF_FAKE_SCREEN), false);
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, false, "nothing was delivered, so nothing is announced");
+  assert.equal(out.notReady, true);
+  assert.equal(out.message, MESSAGES.notReady("Antigravity CLI"),
+    "and it says it is still starting, not that it asked a question");
 });
