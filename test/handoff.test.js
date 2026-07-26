@@ -57,6 +57,36 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
   return { home, env, calls, file };
 }
 
+// A workspace whose source agent is opencode: a real SQLite store, because that
+// is the one source with no per-session file to point a target at.
+const OC_SID = "ses_06af8a6fcffeIyWB7w5lX0xE7y";
+function opencodeWorkspace({ rows = 3, pad = 200 } = {}) {
+  const { env, home } = workspace({ agent: "opencode", sessionRef: { kind: "id", value: OC_SID } });
+  const dir = path.join(home, ".local", "share", "opencode");
+  fs.mkdirSync(dir, { recursive: true });
+  const dbPath = path.join(dir, "opencode.db");
+
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    CREATE TABLE session (id TEXT PRIMARY KEY, project_id TEXT, directory TEXT, title TEXT,
+      agent TEXT, model TEXT, time_created INTEGER, time_updated INTEGER);
+    CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER,
+      time_updated INTEGER, data TEXT);
+    CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT,
+      time_created INTEGER, time_updated INTEGER, data TEXT);
+  `);
+  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)")
+    .run(OC_SID, "proj", "/w", "Fix the parser", "build", "opus", 1, 2);
+  const insert = db.prepare("INSERT INTO message VALUES (?,?,?,?,?)");
+  for (let i = 0; i < rows; i += 1) {
+    insert.run(`m${i}`, OC_SID, i, i, JSON.stringify({ role: "user", text: "x".repeat(pad) }));
+  }
+  db.close();
+
+  return { env, home, dbPath, sessionId: OC_SID };
+}
+
 function readCalls(file) {
   if (!fs.existsSync(file)) return [];
   return fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
@@ -656,4 +686,42 @@ test("the workaround uses the executable name that actually resolved", async () 
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
   assert.ok(argv.some((a) => a === "pane run w5:p2 cursor-agent"), `got ${JSON.stringify(argv)}`);
+});
+
+// opencode's only store is a single database with no per-session files, verified
+// at 304 MiB on the machine this was built on. A session too large to inline has
+// to be materialised somewhere; this is the one place the plugin writes anything.
+const OC_SKIP = !require("../lib/source-sqlite.js").hasSqlite()
+  ? "node:sqlite unavailable (needs Node 22.5+)"
+  : false;
+
+test("a large opencode session is exported once, beside its own database", { skip: OC_SKIP }, async () => {
+  const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 200 });
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+
+  assert.equal(out.ok, true);
+  assert.equal(out.mode, "reference");
+
+  const exported = path.join(path.dirname(dbPath), `herdr-handoff-${sessionId}.jsonl`);
+  assert.ok(fs.existsSync(exported), "the one documented exception");
+  assert.ok(out.prompt.includes(exported), "and the prompt points at it");
+  assert.ok(!out.prompt.includes("opencode.db"), "never at the database itself");
+});
+
+test("handing off the same opencode session twice leaves one file, not two", { skip: OC_SKIP }, async () => {
+  const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 200 });
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+
+  const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
+  assert.deepEqual(ours, [`herdr-handoff-${sessionId}.jsonl`], "overwritten, never accumulated");
+});
+
+test("a small opencode session is inlined and writes nothing at all", { skip: OC_SKIP }, async () => {
+  const { env, dbPath } = opencodeWorkspace({ rows: 3, pad: 20 });
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+
+  assert.equal(out.mode, "inline");
+  const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
+  assert.deepEqual(ours, [], "under budget, opencode gets no exception either");
 });
