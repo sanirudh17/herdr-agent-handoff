@@ -63,25 +63,50 @@ description = "handoff to agent (new tab)"
 
 Herdr stores no transcripts, and its `pane read` sources are terminal scrollback — not history. What
 Herdr does expose is a native session reference for the focused pane. This plugin resolves that
-reference to the agent's **own** session store on disk, snapshots it read-only, and points the new
-agent at it.
+reference to the agent's **own** session store on disk and delivers the whole handoff inside the
+prompt.
+
+**The plugin writes no files.** There is no `HANDOFF.md`, no snapshot directory, no `SOURCE.json`, and
+nothing to prune. One exception is documented below.
 
 1. Read the source pane's agent kind and session reference (`pane get` — the only call made against
    the source).
 2. Resolve the reference to the native session file, or to the opencode database.
 3. If that fails, stop. Nothing is created and you get an error.
 4. Pick a target in the modal.
-5. Snapshot the session verbatim into read-only, line-indexed chunks with a `SOURCE.json` manifest.
-6. Create the split or tab, start the agent, and hand it a one-line prompt pointing at `HANDOFF.md`.
+5. Measure the session: byte count, line count, SHA-256. Nothing is copied.
+6. Build one prompt from it, then create the split or tab, start the agent, and submit it.
 7. Focus the new pane and confirm: `Handoff started: pi → Claude Code (new tab)`.
 
-`HANDOFF.md` instructs the target to read the whole session first, treat it as history, verify
-against the current workspace and prefer it where they disagree, preserve uncommitted work, resume
-from the exact stopping point, and not redo finished investigation.
+The prompt opens with *"You are taking over this session from **pi**"* and carries the instructions in
+full: read the whole session first, treat it as history, verify against the current workspace and
+prefer it where they disagree, preserve uncommitted work, resume from the exact stopping point, and do
+not redo finished investigation.
 
-The snapshot is chunked because sessions are large — 1.85 MB and 868 lines for a real Claude Code
-session — and a single file that big invites an agent to read only part of it. `HANDOFF.md` states the
-part count and total line count and requires reading every part in order.
+### Two modes, chosen by size
+
+`herdr agent prompt` takes its text as a command-line argument, so the whole prompt has to fit inside
+Windows' 32,767-character limit — measured: 32,000 characters reach the server and 40,000 fail with
+`ENAMETOOLONG`. The budget is 30,000, and the mode is decided by building the prompt and measuring it
+rather than by estimating.
+
+**Inline.** A session that fits is embedded in the prompt verbatim. Nothing is written, nothing is
+read, and no permission dialog appears.
+
+**Reference.** A larger session stays where it is. The prompt names the source agent's own transcript,
+its **line count and SHA-256 as of the handoff**, and the ordered 1,200-line ranges to read — the same
+protection the old chunk files gave, as instructions instead of copies. The target is told not to read
+past the pinned last line, because that file is still live and its own agent may append to it.
+
+Reference mode names a path outside your project, so some agents will ask permission to read it. Allow
+it once, or run the agent in a permissive mode.
+
+### The one exception
+
+An opencode session too large to inline is exported to `herdr-handoff-<session>.jsonl` beside
+`opencode.db`, overwritten on each handoff of that session so it never accumulates. opencode stores
+everything in a single database — 304 MiB on the machine this was built on — with no per-session
+files, so above the budget there is nothing to point a target at.
 
 ## Agent support
 
@@ -114,6 +139,10 @@ The handoff never degrades. If the complete session cannot be obtained, it does 
 
 > Full handoff unavailable: complete session context could not be retrieved for this source agent.
 
+That also covers a session too large to inline whose native store is not readable as lines — checked
+concretely: no NUL byte in the first 64 KB, valid UTF-8, at least one newline. An untested resolver
+that points at a binary store fails here rather than handing over something partial.
+
 There is no fallback to a truncated transcript, recent terminal output, a git diff, or a summary. The
 **source** pane is only ever read through `pane get`; its scrollback is never touched, which the test
 suite enforces. The **target's** screen is read once the handoff is sent, purely to confirm the prompt
@@ -127,10 +156,13 @@ reported: the handoff worked and you moved on.
 ## Development
 
 ```bash
-npm test                                   # 120 tests, node:test, no dependencies
-node bin/handoff-split.js --dry-run        # resolve + snapshot, create nothing
+npm test                                   # 249 tests, node:test, no dependencies
+node bin/handoff-split.js --dry-run        # resolve + build the prompt, create nothing
 herdr plugin log list --plugin agent-handoff
 ```
 
 The design rationale, including the verified Herdr API findings this is built on, is in
-`docs/superpowers/specs/2026-07-25-agent-handoff-design.md`.
+`docs/superpowers/specs/2026-07-25-agent-handoff-design.md`. The prompt-only delivery described above
+supersedes its sections 8 and 9 and is specified in
+`docs/superpowers/specs/2026-07-26-prompt-only-handoff-design.md`, with the measurements behind the
+size limits.
