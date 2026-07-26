@@ -122,6 +122,21 @@ Mode selection is decided on the **assembled** prompt, not on an estimate: build
 build mode 2. This keeps fencing, escaping and prose overhead inside the measurement
 rather than in a margin that could drift.
 
+**Confirmation marker.** Delivery is proved by finding a marker on the target's screen, and
+`agent read` returns only the last 400 lines. A 26,000-character prompt wraps well past
+that, so an opening phrase would scroll out of the window before it could be seen. Every
+prompt therefore ends with a short fixed sentinel line — `-- end of handoff, begin now --` —
+and that sentinel is the primary marker. It is the last thing submitted, so it is the last
+thing on screen.
+
+*Open risk, to be settled by live test (section 8).* Several TUIs collapse a large paste
+into a placeholder such as `[Pasted text #1 +612 lines]` rather than echoing it. If a real
+agent does that, neither the sentinel nor any other phrase from the prompt appears, and a
+delivered handoff would be reported as failed. If the live test shows this, mode 1 gains a
+second accepted proof: a paste-placeholder pattern on screen. It does **not** fall back to
+"the screen changed" or "the agent changed state" — both were tried on this branch and both
+announced handoffs that had not been delivered.
+
 ### 3.3 Mode 2 — point at the agent's own session file
 
 Over budget → the prompt names the source agent's **native** transcript at its original
@@ -268,12 +283,14 @@ is otherwise unchanged.
   last range ends at `N`.
 - Range degradation past 40 ranges produces the stated rule and a prompt under budget.
 - Readability gate: a binary native path over budget fails with the catalogue message.
-- Readiness fixtures are the **captured screens in section 5.2**, not hand-built strings,
-  and are asserted through `readScreen`'s own normalisation so a fixture cannot be
-  friendlier than the CLI. Specifically: agy's banner-above-prompt screen is not starting
-  up; claude's `───❯───` line is detected as an input line; grok's single-line capture
-  falls back to the tail; codex's trust dialog is `needsAnswer`.
-- A guard test asserting that no test feeds `startingUp` a string containing a newline.
+- Readiness fixtures are the **captured screens in section 5.2**, stored as files holding
+  the real bytes, and reach `startingUp` only through `readScreen` driven by the fake CLI —
+  never as hand-built literals. Specifically: agy's banner-above-prompt screen is not
+  starting up; claude's `───❯───` line is detected as an input line; grok's single-line
+  capture falls back to the tail; codex's trust dialog is `needsAnswer`.
+- A guard test asserting each fixture round-trips through `readScreen` with its newlines
+  intact. Since 5.3 makes `readScreen` return raw text, a fixture that lost its newlines
+  would silently re-create the inert behaviour of `c6d1434`, and this is what catches that.
 
 ## 9. Limitations
 
