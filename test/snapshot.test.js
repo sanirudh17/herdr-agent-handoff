@@ -134,6 +134,39 @@ test("write marks the snapshot read-only", () => {
   }
 });
 
+const { isReadableText, READABLE_PROBE_BYTES } = require("../lib/snapshot.js");
+
+test("line-oriented UTF-8 text is readable", () => {
+  const body = Buffer.from('{"a":1}\n{"a":2}\n', "utf8");
+  assert.equal(isReadableText(body), true);
+});
+
+test("a NUL byte means it is not text a target can read", () => {
+  const body = Buffer.concat([Buffer.from('{"a":1}\n'), Buffer.from([0x00]), Buffer.from("more\n")]);
+  assert.equal(isReadableText(body), false);
+});
+
+test("invalid UTF-8 is not readable", () => {
+  // 0xC3 starts a two-byte sequence; 0x28 cannot continue it.
+  const body = Buffer.concat([Buffer.from([0xc3, 0x28]), Buffer.from("\n")]);
+  assert.equal(isReadableText(body), false);
+});
+
+test("text with no newline at all is not line-oriented", () => {
+  assert.equal(isReadableText(Buffer.from("one single line, no terminator", "utf8")), false);
+});
+
+test("only the first 64KB is probed, so a late NUL does not disqualify a huge transcript", () => {
+  const head = Buffer.from("{}\n".repeat(30000), "utf8");
+  assert.ok(head.length > READABLE_PROBE_BYTES);
+  const body = Buffer.concat([head, Buffer.from([0x00])]);
+  assert.equal(isReadableText(body), true);
+});
+
+test("an empty buffer is not readable", () => {
+  assert.equal(isReadableText(Buffer.alloc(0)), false);
+});
+
 test("prune keeps the newest directories and removes the rest", () => {
   const base = tmp();
   for (const name of ["a", "b", "c", "d"]) {
