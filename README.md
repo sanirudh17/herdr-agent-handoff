@@ -35,7 +35,14 @@ pi · w5:p1 · 112 lines  →  new tab in workspace 5
 ## Install
 
 ```bash
-herdr plugin link /path/to/agent-handoff
+herdr plugin install sanirudh17/herdr-agent-handoff
+herdr plugin action invoke agent-handoff.setup-keys
+```
+
+To work on it locally instead, link a clone:
+
+```bash
+herdr plugin link /path/to/herdr-agent-handoff
 herdr plugin action invoke agent-handoff.setup-keys
 ```
 
@@ -156,7 +163,7 @@ reported: the handoff worked and you moved on.
 ## Development
 
 ```bash
-npm test                                   # 249 tests, node:test, no dependencies
+npm test                                   # 260 tests, node:test, no dependencies
 node bin/handoff-split.js --dry-run        # resolve + build the prompt, create nothing
 herdr plugin log list --plugin agent-handoff
 ```

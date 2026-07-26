@@ -155,6 +155,10 @@ Five layouts verified on disk. Four are flat files; one is a database.
 | `grok` | `~/.grok/sessions/*/` | **directory** named `<id>`, file `chat_history.jsonl` | `file` |
 | `opencode` | `~/.local/share/opencode/opencode.db` | rows keyed on `session_id = <id>` | `sqlite` |
 
+> **Superseded:** `grok` is no longer a handoff source. Its Herdr integration does not report a
+> session identity, so the owning session could only be guessed. It remains a target. The
+> source list is fourteen agents; see `README.md` for the current one.
+
 Plus `pi` and `omp` when Herdr reports `kind: "path"` — used directly, no resolution needed.
 
 **Best-effort resolvers** (documented roots, runtime-verified, hard-fail if unresolved):

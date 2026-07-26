@@ -1,9 +1,27 @@
 {
   "name": "herdr-agent-handoff",
   "version": "0.1.0",
-  "private": true,
   "description": "Full-session ownership transfer between Herdr-supported coding agents",
   "license": "MIT",
+  "author": "Anirudh S K",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sanirudh17/herdr-agent-handoff.git"
+  },
+  "homepage": "https://github.com/sanirudh17/herdr-agent-handoff#readme",
+  "bugs": {
+    "url": "https://github.com/sanirudh17/herdr-agent-handoff/issues"
+  },
+  "keywords": [
+    "herdr",
+    "herdr-plugin",
+    "agent-handoff",
+    "coding-agents",
+    "terminal"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "node --test \"test/**/*.test.js\""
   }
