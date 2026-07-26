@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer, usable,
-  readScreenForTest, flat,
+  readScreenForTest, flat, inputLineIndex,
 } = require("../lib/handoff.js");
 const herdr = require("../lib/herdr.js");
 
@@ -342,30 +342,69 @@ test("flat collapses whitespace for phrase matching without destroying the sourc
   assert.equal(flat(null), "");
 });
 
-test("startingUp ignores static banner text above an active prompt line", () => {
-  const bannerWithPrompt = [
-    "Antigravity CLI 1.1.7",
-    "agent@example.com (Antigravity Starter Quota)",
-    "Gemini 3.6 Flash (Low)",
-    "~/Herdr Plugin",
-    "",
-    "⚠️Verifying your account...",
-    " └ We're finishing verifying your account eligibility.",
-    "   This usually takes a moment. Please try again shortly.",
-    "",
-    "> ",
-    "? for shortcuts",
-  ].join("\n");
+// These four are real captures taken from live panes, held as files and served
+// through the fake CLI. A literal in this file could carry a shape the CLI never
+// produces - Grok's capture has no newline in it at all - and that is exactly how
+// the previous rule came to look tested while being unreachable.
+const SCREENS = path.join(__dirname, "fixtures", "screens");
+const screen = (name) => screenFrom(path.join(SCREENS, name));
 
-  assert.equal(startingUp(bannerWithPrompt), false, "screen with active prompt line is not starting up");
+test("every screen fixture arrives with the bytes its file holds", () => {
+  for (const name of ["agy-verifying.txt", "claude-idle.txt", "grok-idle.txt", "codex-trust.txt"]) {
+    assert.equal(screen(name), fs.readFileSync(path.join(SCREENS, name), "utf8"),
+      `${name} was altered on the way in`);
+  }
+});
 
-  const bannerWithoutPrompt = [
-    "⚠️Verifying your account...",
-    " └ We're finishing verifying your account eligibility.",
-    "   This usually takes a moment. Please try again shortly.",
-  ].join("\n");
+test("Antigravity's account banner above its input line is history, not current state", () => {
+  assert.equal(startingUp(screen("agy-verifying.txt")), false,
+    "the notice sits above a drawn input box; the agent is waiting for input");
+});
 
-  assert.equal(startingUp(bannerWithoutPrompt), true, "screen without prompt line is starting up");
+test("the same notice with no input box anywhere is current state", () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nobox-")), "s.txt");
+  fs.writeFileSync(file,
+    "⚠️Verifying your account...\n └ We're finishing verifying your account eligibility.\n");
+  assert.equal(startingUp(screenFrom(file)), true);
+});
+
+test("Claude Code's prompt drawn inside a border line is found", () => {
+  const lines = screen("claude-idle.txt").split("\n");
+  const i = inputLineIndex(lines);
+  assert.ok(i >= 0, "───────❯──────── is an input line");
+  assert.ok(lines[i].includes("❯"));
+});
+
+test("Grok's box-drawn prompt is found when the capture has lines", () => {
+  assert.equal(inputLineIndex(["╭─────────╮", "│ >       │", "╰─ Grok ──╯"]), 1);
+});
+
+test("a capture with no newlines falls back to the character tail rather than guessing", () => {
+  const raw = screen("grok-idle.txt");
+  assert.ok(!raw.includes("\n"), "this is what the CLI actually returns for Grok");
+  assert.equal(inputLineIndex(raw.split("\n")), -1, "one line: nothing to reason about");
+  assert.equal(startingUp(raw), false, "and its tail holds no startup phrase");
+});
+
+test("a startup notice below the input line still counts", () => {
+  const lines = ["> ", "────────────", "Signing in to your account…"];
+  assert.equal(startingUp(lines.join("\n")), true,
+    "a footer notice is current state, unlike a banner above the box");
+});
+
+test("Codex's trust dialog is a question, and questions are never typed into", () => {
+  assert.equal(needsAnswer(screen("codex-trust.txt")), true);
+});
+
+test("prose containing a quoted line is not mistaken for an input box", () => {
+  const lines = [
+    "> the previous agent wrote this in a markdown blockquote",
+    "and then twelve more lines of ordinary output followed",
+    "line 3", "line 4", "line 5", "line 6", "line 7", "line 8", "line 9", "line 10",
+    "Signing in to your account…",
+  ];
+  assert.equal(startingUp(lines.join("\n")), true,
+    "the quote is far above the bottom and must not shield the notice");
 });
 
 test("closing the target mid-confirmation is not reported as a failure", async () => {

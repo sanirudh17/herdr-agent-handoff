@@ -1,0 +1,8 @@
+⚠️Verifying your account...
+ └ We're finishing verifying your account eligibility.
+   This usually takes a moment. Please try again shortly.
+
+────────────────────────────────────────────
+>
+────────────────────────────────────────────
+? for shortcuts       Gemini 3.6 Flash · low
