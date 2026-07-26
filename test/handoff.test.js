@@ -73,17 +73,39 @@ test("dry run resolves and snapshots without creating panes", async () => {
   assert.ok(!argv.some((a) => a.startsWith("agent start")), "must not start an agent in dry run");
 });
 
-test("dry run writes a complete snapshot and briefing", async () => {
-  const { env } = workspace({ lines: 5 });
+test("a dry run builds the whole handoff into the prompt and writes nothing", async () => {
+  const { env, home, file } = workspace({ lines: 5 });
   const out = await run({ destination: "split", env, dryRun: true });
-  const dir = out.handoffDir;
-  assert.ok(fs.existsSync(path.join(dir, "HANDOFF.md")));
-  assert.ok(fs.existsSync(path.join(dir, "SOURCE.json")));
-  const source = JSON.parse(fs.readFileSync(path.join(dir, "SOURCE.json"), "utf8"));
-  assert.equal(source.total_lines, 5);
-  const parts = fs.readdirSync(path.join(dir, "session"));
-  const joined = Buffer.concat(parts.sort().map((p) => fs.readFileSync(path.join(dir, "session", p))));
-  assert.equal(joined.toString(), fs.readFileSync(source.native_path, "utf8"));
+
+  assert.equal(out.mode, "inline", "five lines fit inside the prompt");
+  assert.match(out.prompt, /^You are taking over this session from/);
+  assert.equal(out.handoffDir, undefined, "there is no handoff directory any more");
+
+  const transcript = fs.readFileSync(file, "utf8");
+  assert.ok(out.prompt.includes(transcript), "the session travels verbatim inside the prompt");
+  assert.ok(!fs.existsSync(path.join(home, "state", "handoffs")), "no handoffs directory");
+});
+
+test("a session too large to inline becomes a reference to the agent's own file", async () => {
+  const { env, home, file } = workspace({ lines: 4000 });
+  const out = await run({ destination: "split", env, dryRun: true });
+
+  assert.equal(out.mode, "reference");
+  assert.ok(out.prompt.includes(file), "the prompt names the source agent's own transcript");
+  assert.ok(out.prompt.length < 32_767, "and still fits the command line");
+  assert.ok(!fs.existsSync(path.join(home, "state", "handoffs")), "still nothing written");
+});
+
+test("an over-budget source that is not readable text reports no full context", async () => {
+  const { env, file } = workspace({ lines: 4000 });
+  // A layout that resolves to bytes no target can read as lines. Over budget, that
+  // cannot be handed over honestly, so it must not be handed over at all.
+  const body = fs.readFileSync(file);
+  fs.writeFileSync(file, Buffer.concat([Buffer.from([0x00]), body]));
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false);
+  assert.equal(out.message, MESSAGES.noContext);
 });
 
 test("a pane with no agent fails before opening the picker", async () => {
@@ -155,7 +177,11 @@ test("the source pane is only ever read", async () => {
   await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   for (const call of readCalls(calls)) {
     const text = call.join(" ");
-    const touchesSource = text.includes("w5:p1");
+    // Check the pane the command *addresses*, not the text it carries. The prompt
+    // body names the source pane in its identity table and its boundary rule, and a
+    // substring scan cannot tell that from writing to it.
+    const addressed = call[0] === "agent" && call[1] === "prompt" ? call.slice(0, 3) : call;
+    const touchesSource = addressed.some((arg) => arg === "w5:p1");
     const isRead =
       text.startsWith("pane get") || text.startsWith("pane split") || text.startsWith("pane list");
     assert.ok(!touchesSource || isRead, `unexpected write to the source pane: ${text}`);
@@ -170,15 +196,14 @@ test("the source pane is only ever read", async () => {
   }
 });
 
-test("the prompt is a single line pointing at HANDOFF.md", async () => {
+test("the prompt the target receives is exactly the prompt that was built", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  const prompt = readCalls(calls).find((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.ok(prompt, "expected an agent prompt call");
-  const text = prompt[3];
-  assert.ok(!text.includes("\n"), "prompt must be one line");
-  assert.match(text, /HANDOFF\.md/);
-  assert.match(text, /^Session handoff from pi\./);
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  assert.equal(prompts.length, 1, "submitted exactly once");
+  assert.equal(prompts[0][3], out.prompt, "nothing is added or trimmed on the way out");
+  assert.match(out.prompt, /^You are taking over this session from \*\*pi\*\*/);
+  assert.ok(!out.prompt.includes("HANDOFF.md"), "there is no document to point at");
 });
 
 test("a failed target creation reports and creates no agent", async () => {

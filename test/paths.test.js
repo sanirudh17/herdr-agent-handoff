@@ -35,9 +35,14 @@ test("pluginRoot falls back to cwd when the env var is absent", () => {
   assert.equal(paths.pluginRoot({}), paths.stripVerbatim(process.cwd()));
 });
 
-test("handoffsDir and requestsDir sit under stateDir", () => {
+test("requestsDir sits under stateDir", () => {
   const dir = path.join(path.sep, "tmp", "state");
   const env = { HERDR_PLUGIN_STATE_DIR: dir };
-  assert.equal(paths.handoffsDir(env), path.join(dir, "handoffs"));
   assert.equal(paths.requestsDir(env), path.join(dir, "requests"));
+});
+
+test("there is no handoffs directory, because nothing is stored", () => {
+  // The handoff travels inside the prompt. A session too large to inline is read
+  // by the target from where its own agent put it.
+  assert.equal(paths.handoffsDir, undefined);
 });
