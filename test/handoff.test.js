@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer, usable,
-  readScreenForTest, flat, inputLineIndex,
+  readScreenForTest, flat, inputLineIndex, timings,
 } = require("../lib/handoff.js");
 const herdr = require("../lib/herdr.js");
 const briefing = require("../lib/briefing.js");
@@ -42,6 +42,7 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
     // Real delivery backoff spans about a minute; the tests should not.
     HANDOFF_SETTLE_MS: "0",
+    HANDOFF_AGY_SETTLE_MS: "0",
     HANDOFF_STILL_MS: "0",
     HANDOFF_READY_CAP_MS: "0",
     HANDOFF_CONFIRM_WINDOW_MS: "300",
@@ -638,6 +639,11 @@ test("a slow-starting target is announced instead of leaving a silent pane", () 
   assert.match(MESSAGES.startingUp("Antigravity CLI"), /Antigravity CLI/);
 });
 
+test("Antigravity waits 7.5 seconds before the handoff prompt", () => {
+  assert.equal(timings({}).agySettle, 7500);
+  assert.equal(timings({ HANDOFF_AGY_SETTLE_MS: "8000" }).agySettle, 8000);
+});
+
 test("a shell listing only itself in the foreground is at its prompt", () => {
   // Windows reports the shell as its own foreground process; an empty list is
   // the POSIX shape. Both mean ready.
@@ -681,6 +687,23 @@ test("the Windows workaround launches the agent through the pane shell", async (
   assert.ok(argv.some((a) => a === "pane run w5:p2 claude"), `got ${JSON.stringify(argv)}`);
   assert.ok(argv.some((a) => a.startsWith("agent wait w5:p2")), "must wait for readiness");
   assert.ok(argv.some((a) => a.startsWith("agent prompt w5:p2")), "prompt addresses the pane");
+});
+
+test("Antigravity starts without TERM in a Windows Herdr pane", async () => {
+  const { env, home, calls } = workspace();
+  env.HANDOFF_AGENT_START = "pane-run";
+  fs.writeFileSync(path.join(home, "bin", "agy"), "#!/bin/sh\n", { mode: 0o755 });
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  assert.equal(out.ok, true);
+
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  const command = "pane run w5:p2 $env:TERM=''; agy";
+  if (process.platform === "win32") {
+    assert.ok(argv.some((a) => a === command), `got ${JSON.stringify(argv)}`);
+  } else {
+    assert.ok(argv.some((a) => a === "pane run w5:p2 agy"), `got ${JSON.stringify(argv)}`);
+  }
 });
 
 test("the workaround uses the executable name that actually resolved", async () => {
@@ -882,9 +905,7 @@ test("a banner above the input box explains a failure even though it did not del
 
   const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
   assert.equal(out.ok, false, "nothing was delivered, so nothing is announced");
-  assert.equal(out.notReady, true);
-  assert.equal(out.message, MESSAGES.notReady("Antigravity CLI"),
-    "and it says it is still starting, not that it asked a question");
+  assert.equal(out.message, MESSAGES.promptFailed("Antigravity CLI"));
 });
 
 test("an agent that exits leaving its pane behind is reported, not passed over", async () => {

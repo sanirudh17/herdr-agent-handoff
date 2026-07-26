@@ -66,14 +66,6 @@ test("pi resolves <timestamp>_<id>.jsonl", () => {
   assert.equal(got.path, file);
 });
 
-test("grok resolves chat_history.jsonl inside a directory named for the session", () => {
-  const home = tmpHome();
-  const file = writeFile(path.join(home, ".grok", "sessions", "C%3A%5Cproj", ID, "chat_history.jsonl"), BODY);
-  writeFile(path.join(home, ".grok", "sessions", "C%3A%5Cproj", ID, "announcement_state.json"), "{}");
-  const got = resolve({ agent: "grok", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
-  assert.equal(got.path, file);
-});
-
 test("opencode returns a sqlite descriptor rather than a file", () => {
   const home = tmpHome();
   const db = writeFile(path.join(home, ".local", "share", "opencode", "opencode.db"), "x");
@@ -87,7 +79,7 @@ test("opencode returns a sqlite descriptor rather than a file", () => {
 
 test("non-integrated kinds are refused outright", () => {
   const home = tmpHome();
-  for (const agent of ["gemini", "agy", "cline", "kiro", "amp", "maki"]) {
+  for (const agent of ["gemini", "agy", "cline", "kiro", "amp", "grok", "maki"]) {
     assert.throws(
       () => resolve({ agent, sessionRef: { kind: "id", value: ID }, homedir: home, env: {} }),
       (err) => {

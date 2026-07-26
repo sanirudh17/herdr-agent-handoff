@@ -112,24 +112,24 @@ files, so above the budget there is nothing to point a target at.
 
 Any of the 21 agent kinds Herdr can start may be a **target**, if its binary is on your `PATH`.
 
-**Sources** are limited to the 15 agents that report a session identity to Herdr. Verified against
-real session stores:
+**Sources** are limited to the 14 agents whose Herdr integrations report a session identity.
+The source integration must be installed before its session can be handed off. Verified against real
+session stores:
 
 | agent | store |
 |---|---|
 | `claude` | `~/.claude/projects/*/<id>.jsonl` |
 | `codex` | `~/.codex/sessions/**/rollout-*-<id>.jsonl` |
 | `pi` | `~/.pi/agent/sessions/**/*_<id>.jsonl` |
-| `grok` | `~/.grok/sessions/*/<id>/chat_history.jsonl` |
 | `opencode` | `~/.local/share/opencode/opencode.db` (read-only SQLite) |
 
 Supported with documented but untested store locations: `copilot`, `devin`, `droid`, `kimi`,
 `qodercli`, `kilo`, `cursor`, `mastracode`, `hermes`, `omp`. Each is verified at runtime and fails
 hard rather than degrading, so an untested resolver can never produce a partial transfer.
 
-`gemini`, `agy`, `cline`, `kiro`, `amp` and `maki` **cannot be sources**: Herdr's
-`is_official_agent_source()` excludes them, so no session identity is reported and the owning session
-could only be guessed. They work fine as targets. This matters most for `agy` — Gemini CLI was retired
+`gemini`, `agy`, `cline`, `grok`, `kiro`, `amp` and `maki` **cannot be sources**: their Herdr
+integration does not report a session identity, so the owning session could only be guessed. They work
+fine as targets. This matters most for `agy` — Gemini CLI was retired
 on 2026-06-18 and Antigravity CLI is its successor, so an `agy` session integration is the most
 valuable thing Herdr could add for this plugin.
 
