@@ -1,0 +1,4 @@
+# Real terminal captures from live agent panes. Readiness detection reasons about
+# their line structure, so their bytes must survive a checkout unchanged on every
+# platform — a CRLF conversion here would silently alter the thing under test.
+test/fixtures/screens/* -text
