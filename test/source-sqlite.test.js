@@ -139,6 +139,42 @@ test("extract succeeds when the event log has been pruned", { skip: SKIP }, () =
   assert.ok(out.lines > 0);
 });
 
+const { extractToBuffer, exportPathFor } = require("../lib/source-sqlite.js");
+
+test("extractToBuffer returns the same bytes extract writes, and touches no disk", { skip: SKIP }, () => {
+  const dbPath = buildDb();
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-oc-buf-"));
+
+  const inMemory = extractToBuffer({ dbPath, sessionId: SID, workDir });
+  assert.deepEqual(
+    fs.readdirSync(workDir), [],
+    "extractToBuffer must not leave anything behind, not even a copy"
+  );
+
+  const onDisk = extract({ dbPath, sessionId: SID, workDir });
+  assert.deepEqual(
+    inMemory.body, fs.readFileSync(onDisk.jsonlPath),
+    "the buffer is byte-identical to the exported file"
+  );
+  assert.equal(inMemory.lines, onDisk.lines);
+  assert.deepEqual(inMemory.counts, onDisk.counts);
+});
+
+test("extractToBuffer cleans up after itself when it has to fall back to a copy", { skip: SKIP }, () => {
+  const dbPath = buildDb();
+  const out = extractToBuffer({ dbPath, sessionId: SID, mode: "copy" });
+  assert.equal(out.opened, "copy");
+  assert.equal(out.counts.message, 2);
+  assert.ok(out.body.length > 0, "the rows still come back even via the copy path");
+});
+
+test("the opencode export path sits beside the database and names the session", () => {
+  const dbPath = path.join("/var", "data", "opencode", "opencode.db");
+  const p = exportPathFor(dbPath, "ses_abc123");
+  assert.equal(path.basename(p), "herdr-handoff-ses_abc123.jsonl");
+  assert.equal(path.dirname(p), path.dirname(dbPath));
+});
+
 test("extract tolerates a database missing the newer tables", { skip: SKIP }, () => {
   const { DatabaseSync } = require("node:sqlite");
   const dbPath = buildDb();
