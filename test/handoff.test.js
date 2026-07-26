@@ -5,7 +5,9 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer, usable,
+  readScreenForTest, flat,
 } = require("../lib/handoff.js");
+const herdr = require("../lib/herdr.js");
 
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
@@ -307,6 +309,37 @@ test("a busy target is waited for, then still handed off", async () => {
   assert.equal(out.ok, true);
   const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
   assert.equal(prompts.length, 1, "busy is a reason to wait, not to give up");
+});
+
+// The screen has to arrive the way the CLI sends it. readScreen used to return
+// normalize(out), which collapses every run of whitespace to one space: measured on
+// live panes, raw captures carried 52 (pi) and 37 (agy) newlines and the normalised
+// strings carried zero. Any rule that reasons about line structure was dead on
+// arrival, which is how an unreachable rule came to look tested.
+function screenFrom(file) {
+  const env = {
+    ...process.env,
+    HERDR_BIN_PATH: process.execPath,
+    HANDOFF_FAKE_SCRIPT: SCRIPT,
+    FAKE_SCREEN_FILE: file,
+  };
+  const call = (args, opts = {}) => herdr.run([SCRIPT, ...args], { env, ...opts });
+  return readScreenForTest(call, "w1:p1");
+}
+
+test("readScreen hands back the screen with its lines intact", () => {
+  const screen = "banner line\n\n  ─────❯      ─────\n? for shortcuts\n";
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "screen-")), "s.txt");
+  fs.writeFileSync(file, screen);
+
+  const got = screenFrom(file);
+  assert.equal(got, screen, "not one newline may be lost on the way in");
+  assert.ok(got.includes("\n"), "this is the guard: no newline means the line rules cannot fire");
+});
+
+test("flat collapses whitespace for phrase matching without destroying the source", () => {
+  assert.equal(flat("a\n\n  b"), "a b");
+  assert.equal(flat(null), "");
 });
 
 test("startingUp ignores static banner text above an active prompt line", () => {

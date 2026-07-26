@@ -152,6 +152,13 @@ if (argv[0] === "agent" && argv[1] === "get") {
 // recorded calls are the source of truth: if a prompt was submitted, it shows.
 // HANDOFF_FAKE_REACTS=never models a TUI that swallows input while still starting.
 if (argv[0] === "agent" && argv[1] === "read") {
+  // FAKE_SCREEN_FILE returns a real captured screen byte for byte. Readiness rules
+  // reason about line structure, so a fixture that reflowed or re-indented the
+  // capture would be friendlier than the CLI and could hide an unreachable rule.
+  if (process.env.FAKE_SCREEN_FILE) {
+    process.stdout.write(fs.readFileSync(process.env.FAKE_SCREEN_FILE));
+    process.exit(0);
+  }
   let text = "";
   // HANDOFF_FAKE_SWALLOW_FIRST=n discards the first n submissions, modelling an
   // agent whose input box is not listening yet.
