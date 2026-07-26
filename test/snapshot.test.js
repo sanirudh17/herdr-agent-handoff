@@ -1,140 +1,12 @@
+"use strict";
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { chunk, write, prune } = require("../lib/snapshot.js");
-
-function tmp() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "handoff-snap-"));
-}
-
-const META = {
-  sourceKind: "pi", sourceName: "pi", sessionId: "abc", sourcePaneId: "w5:p1",
-  workspaceId: "w5", tabId: "w5:t1", cwd: "/w", destination: "tab",
-  targetKind: "claude", targetName: "Claude Code",
-};
-
-test("chunk splits on line boundaries and reassembles byte-for-byte", () => {
-  const body = Buffer.from("a\nb\nc\nd\ne\n");
-  const parts = chunk(body, { maxLines: 2, maxBytes: 1024 });
-  assert.equal(parts.length, 3);
-  assert.deepEqual(parts.map((p) => p.lines), [2, 2, 1]);
-  assert.deepEqual(Buffer.concat(parts.map((p) => p.buffer)), body);
-});
-
-test("chunk respects the byte cap even when the line cap is not reached", () => {
-  const body = Buffer.from("aaaa\nbbbb\ncccc\n");
-  const parts = chunk(body, { maxLines: 1000, maxBytes: 6 });
-  assert.ok(parts.length >= 3);
-  assert.deepEqual(Buffer.concat(parts.map((p) => p.buffer)), body);
-});
-
-test("chunk handles a final line with no trailing newline", () => {
-  const body = Buffer.from("a\nb");
-  const parts = chunk(body, { maxLines: 1, maxBytes: 1024 });
-  assert.deepEqual(parts.map((p) => p.lines), [1, 1]);
-  assert.deepEqual(Buffer.concat(parts.map((p) => p.buffer)), body);
-});
-
-test("chunk handles a single line", () => {
-  const body = Buffer.from("only\n");
-  const parts = chunk(body, { maxLines: 1200, maxBytes: 1024 });
-  assert.equal(parts.length, 1);
-  assert.equal(parts[0].lines, 1);
-});
-
-test("chunk handles an exact boundary without emitting an empty part", () => {
-  const body = Buffer.from("a\nb\n");
-  const parts = chunk(body, { maxLines: 2, maxBytes: 1024 });
-  assert.equal(parts.length, 1);
-  assert.deepEqual(Buffer.concat(parts.map((p) => p.buffer)), body);
-});
-
-test("chunk returns nothing for an empty buffer", () => {
-  assert.deepEqual(chunk(Buffer.alloc(0)), []);
-});
-
-test("write produces parts that reassemble into the original file", () => {
-  const home = tmp();
-  const src = path.join(home, "session.jsonl");
-  const body = Array.from({ length: 3000 }, (_, i) => JSON.stringify({ i })).join("\n") + "\n";
-  fs.writeFileSync(src, body);
-
-  const base = tmp();
-  const out = write({
-    resolved: { strategy: "file", path: src, bytes: Buffer.byteLength(body), lines: 3000 },
-    meta: META, baseDir: base, now: new Date("2026-07-25T12:00:00Z"),
-  });
-
-  assert.ok(out.parts.length >= 3, "3000 lines should exceed one 1200-line part");
-  const joined = Buffer.concat(out.parts.map((p) => fs.readFileSync(p.file)));
-  assert.deepEqual(joined, Buffer.from(body));
-  assert.equal(out.totalLines, 3000);
-  assert.equal(out.sha256, crypto.createHash("sha256").update(body).digest("hex"));
-});
-
-test("write records contiguous part line ranges summing to the total", () => {
-  const home = tmp();
-  const src = path.join(home, "s.jsonl");
-  const body = Array.from({ length: 2500 }, (_, i) => `line ${i}`).join("\n") + "\n";
-  fs.writeFileSync(src, body);
-  const base = tmp();
-  const out = write({
-    resolved: { strategy: "file", path: src, bytes: Buffer.byteLength(body), lines: 2500 },
-    meta: META, baseDir: base,
-  });
-
-  let expected = 1;
-  let sum = 0;
-  for (const part of out.parts) {
-    assert.equal(part.firstLine, expected);
-    assert.equal(part.lastLine, expected + part.lines - 1);
-    expected = part.lastLine + 1;
-    sum += part.lines;
-  }
-  assert.equal(sum, out.totalLines);
-});
-
-test("write emits SOURCE.json with the metadata and part index", () => {
-  const home = tmp();
-  const src = path.join(home, "s.jsonl");
-  fs.writeFileSync(src, "a\nb\n");
-  const base = tmp();
-  const out = write({
-    resolved: { strategy: "file", path: src, bytes: 4, lines: 2 },
-    meta: META, baseDir: base,
-  });
-  const source = JSON.parse(fs.readFileSync(path.join(out.dir, "SOURCE.json"), "utf8"));
-  assert.equal(source.source_agent, "pi");
-  assert.equal(source.strategy, "file");
-  assert.equal(source.native_path, src);
-  assert.equal(source.total_lines, 2);
-  assert.equal(source.parts.length, out.parts.length);
-  assert.equal(source.source_pane_id, "w5:p1");
-});
-
-test("write marks the snapshot read-only", () => {
-  const home = tmp();
-  const src = path.join(home, "s.jsonl");
-  fs.writeFileSync(src, "a\n");
-  const base = tmp();
-  const out = write({
-    resolved: { strategy: "file", path: src, bytes: 2, lines: 1 }, meta: META, baseDir: base,
-  });
-  if (process.platform !== "win32") {
-    const mode = fs.statSync(out.parts[0].file).mode & 0o777;
-    assert.equal(mode, 0o444);
-  } else {
-    assert.throws(
-      () => fs.writeFileSync(out.parts[0].file, "clobber"),
-      "a read-only part must not be writable"
-    );
-  }
-});
-
-const { isReadableText, READABLE_PROBE_BYTES } = require("../lib/snapshot.js");
+const { measure, isReadableText, READABLE_PROBE_BYTES } = require("../lib/snapshot.js");
 
 test("line-oriented UTF-8 text is readable", () => {
   const body = Buffer.from('{"a":1}\n{"a":2}\n', "utf8");
@@ -167,13 +39,45 @@ test("an empty buffer is not readable", () => {
   assert.equal(isReadableText(Buffer.alloc(0)), false);
 });
 
-test("prune keeps the newest directories and removes the rest", () => {
-  const base = tmp();
-  for (const name of ["a", "b", "c", "d"]) {
-    fs.mkdirSync(path.join(base, name), { recursive: true });
-    fs.writeFileSync(path.join(base, name, "x"), "x");
+function tempFile(contents) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "measure-"));
+  const file = path.join(dir, "session.jsonl");
+  fs.writeFileSync(file, contents);
+  return { dir, file };
+}
+
+test("a file session is measured, hashed and left exactly where it is", () => {
+  const contents = '{"n":1}\n{"n":2}\n{"n":3}\n';
+  const { dir, file } = tempFile(contents);
+  const before = fs.readdirSync(dir);
+
+  const m = measure({ resolved: { strategy: "file", path: file } });
+
+  assert.equal(m.strategy, "file");
+  assert.equal(m.nativePath, file);
+  assert.equal(m.bytes, Buffer.byteLength(contents));
+  assert.equal(m.lines, 3);
+  assert.equal(m.sha256, crypto.createHash("sha256").update(contents).digest("hex"));
+  assert.equal(m.readable, true);
+  assert.equal(m.counts, null);
+  assert.equal(m.body.toString("utf8"), contents, "the body is the file byte for byte");
+  assert.deepEqual(fs.readdirSync(dir), before, "measuring writes nothing");
+});
+
+test("a final line without a trailing newline still counts", () => {
+  const { file } = tempFile('{"n":1}\n{"n":2}');
+  assert.equal(measure({ resolved: { strategy: "file", path: file } }).lines, 2);
+});
+
+test("an unreadable native file is measured but flagged, not thrown on", () => {
+  const { file } = tempFile(Buffer.from([0x00, 0x01, 0x02]));
+  const m = measure({ resolved: { strategy: "file", path: file } });
+  assert.equal(m.readable, false, "the caller decides what to do about it");
+});
+
+test("measure no longer offers the copying API", () => {
+  const snapshot = require("../lib/snapshot.js");
+  for (const gone of ["write", "prune", "chunk"]) {
+    assert.equal(snapshot[gone], undefined, `${gone} should be gone: nothing is copied any more`);
   }
-  const removed = prune(base, 2);
-  assert.equal(removed.length, 2);
-  assert.equal(fs.readdirSync(base).length, 2);
 });
