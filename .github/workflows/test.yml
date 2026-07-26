@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Never cancel the other platforms because one failed: which platforms fail
+      # is the whole point of running a matrix.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # No install step and no lockfile: the plugin has zero runtime and zero
+      # development dependencies, and the suite runs on node:test alone.
+      - name: Versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Tests
+        run: npm test

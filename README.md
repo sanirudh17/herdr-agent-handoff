@@ -1,5 +1,7 @@
 # Agent Handoff
 
+[![tests](https://github.com/sanirudh17/herdr-agent-handoff/actions/workflows/test.yml/badge.svg)](https://github.com/sanirudh17/herdr-agent-handoff/actions/workflows/test.yml)
+
 A Herdr plugin that transfers an in-progress task from the agent in the active pane to a **fresh
 session of another installed agent**, carrying the complete source session with it. No summary, no
 truncated transcript, no follow-up prompt to write.
@@ -139,6 +141,39 @@ integration does not report a session identity, so the owning session could only
 fine as targets. This matters most for `agy` — Gemini CLI was retired
 on 2026-06-18 and Antigravity CLI is its successor, so an `agy` session integration is the most
 valuable thing Herdr could add for this plugin.
+
+## Platform support
+
+Windows, macOS and Linux are all supported, and the test suite runs on all three on every push.
+Being straight about what that does and does not mean:
+
+| | status |
+|---|---|
+| Test suite (260 tests, all platforms) | ✅ verified in CI |
+| Live handoffs on **Windows** | ✅ verified against pi, Claude Code, Codex, Hermes and Grok |
+| Live handoffs on **macOS / Linux** | ⚠️ not yet exercised by the author |
+
+CI proves the logic and the path handling, because the suite drives a stand-in for the Herdr CLI. It
+cannot install Herdr or launch real agents, so a green badge is not evidence that a handoff completes
+on a Mac. If you run this on macOS or Linux, reports are very welcome — an
+[issue](https://github.com/sanirudh17/herdr-agent-handoff/issues) saying it just worked is as useful
+as one saying it did not.
+
+Two known differences off Windows:
+
+- **The agent is launched differently.** macOS and Linux use Herdr's documented `agent start`. Windows
+  cannot: Herdr renders the launch line with `-ArgumentList ''` for an agent that takes no arguments,
+  which PowerShell rejects outright, so on Windows the agent is started by typing at the pane's own
+  shell instead. The Unix path is the supported one; it is simply the one with less mileage here.
+- **The prompt budget is sized for Windows.** 30,000 characters comes from Windows' 32,767-character
+  command-line limit. macOS (`ARG_MAX` ≈ 256 KB) and Linux (≈ 2 MB) could inline much larger sessions,
+  so on those platforms handoffs fall back to reference mode sooner than they strictly need to — which
+  means the read-permission dialog appears more often than it has to. Conservative, not incorrect.
+
+If a handoff does fail on any platform, it fails safely. The complete session is resolved *before*
+anything is created, and the source pane is only ever read — never written to, closed, interrupted, or
+typed into. The worst outcome is a message naming the step that failed, with the original session
+untouched.
 
 ## Failure behaviour
 
