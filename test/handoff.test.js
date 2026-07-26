@@ -309,6 +309,32 @@ test("a busy target is waited for, then still handed off", async () => {
   assert.equal(prompts.length, 1, "busy is a reason to wait, not to give up");
 });
 
+test("startingUp ignores static banner text above an active prompt line", () => {
+  const bannerWithPrompt = [
+    "Antigravity CLI 1.1.7",
+    "agent@example.com (Antigravity Starter Quota)",
+    "Gemini 3.6 Flash (Low)",
+    "~/Herdr Plugin",
+    "",
+    "⚠️Verifying your account...",
+    " └ We're finishing verifying your account eligibility.",
+    "   This usually takes a moment. Please try again shortly.",
+    "",
+    "> ",
+    "? for shortcuts",
+  ].join("\n");
+
+  assert.equal(startingUp(bannerWithPrompt), false, "screen with active prompt line is not starting up");
+
+  const bannerWithoutPrompt = [
+    "⚠️Verifying your account...",
+    " └ We're finishing verifying your account eligibility.",
+    "   This usually takes a moment. Please try again shortly.",
+  ].join("\n");
+
+  assert.equal(startingUp(bannerWithoutPrompt), true, "screen without prompt line is starting up");
+});
+
 test("closing the target mid-confirmation is not reported as a failure", async () => {
   const { env } = workspace();
   // The user read the result and closed the pane. The handoff worked; saying it
