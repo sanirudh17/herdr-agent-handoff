@@ -124,6 +124,65 @@ test("the prose alone leaves real room for a transcript", () => {
   assert.equal(PROMPT_BUDGET, 30000);
 });
 
+const { renderReference } = require("../lib/briefing.js");
+const { PER_RANGE, MAX_LISTED } = require("../lib/ranges.js");
+
+function bigSession(lines) {
+  return {
+    strategy: "file",
+    nativePath: "C:\\Users\\sanir\\.codex\\sessions\\rollout-2026-03-31-019d4393.jsonl",
+    body: Buffer.alloc(0), bytes: 581_632, lines,
+    sha256: "b".repeat(64), counts: null, readable: true,
+  };
+}
+
+test("the reference prompt names the agent's own file and pins what to read", () => {
+  const s = bigSession(3000);
+  const text = renderReference({ meta: META, session: s });
+  assert.match(text, /^You are taking over this session from \*\*Codex\*\*/);
+  assert.ok(text.includes(s.nativePath), "the target needs the path");
+  assert.ok(text.includes("3,000"), "the pinned line count");
+  assert.ok(text.includes(s.sha256));
+});
+
+test("line ranges are enumerated in order and stop at the pinned last line", () => {
+  const text = renderReference({ meta: META, session: bigSession(3000) });
+  assert.ok(text.includes("1–1200"));
+  assert.ok(text.includes("1201–2400"));
+  assert.ok(text.includes("2401–3000"), "the last range ends at N, not at a round number");
+});
+
+test("reading past the pinned line is ruled out, because the file is live", () => {
+  const text = renderReference({ meta: META, session: bigSession(3000) });
+  assert.match(text, /do not read past line 3,000/i);
+});
+
+test("a very long session states the rule instead of listing every range", () => {
+  const s = bigSession(PER_RANGE * (MAX_LISTED + 25));
+  const text = renderReference({ meta: META, session: s });
+  assert.ok(!text.includes(`${PER_RANGE * (MAX_LISTED + 20)}`), "no unbounded enumeration");
+  assert.match(text, /each following 1,200 lines/i, "a stated rule takes over");
+  assert.ok(text.length < PROMPT_BUDGET, `reference prompt is ${text.length}, over budget`);
+});
+
+test("the reference prompt also ends with the sentinel", () => {
+  const text = renderReference({ meta: META, session: bigSession(3000) });
+  assert.ok(text.trimEnd().endsWith(SENTINEL));
+});
+
+test("the reference prompt carries the same six rules as the inline one", () => {
+  const text = renderReference({ meta: META, session: bigSession(3000) }).toLowerCase();
+  for (const rule of [
+    "read the complete source session before acting",
+    "treat it as historical context",
+    "preserve uncommitted work",
+    "continue from the exact stopping point",
+    "do not redo completed investigation",
+  ]) {
+    assert.ok(text.includes(rule), `missing rule: ${rule}`);
+  }
+});
+
 test("briefing no longer offers the document-era API", () => {
   const briefing = require("../lib/briefing.js");
   assert.equal(briefing.kickoff, undefined);
