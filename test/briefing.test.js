@@ -4,6 +4,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { renderInline, SENTINEL, PROMPT_BUDGET } = require("../lib/briefing.js");
 
+const nodePath = require("node:path");
+// Built with path.join so basename() works on every platform, not just Windows.
+const NATIVE_PATH = nodePath.join("C:", "x", "rollout-1.jsonl");
+const BIG_NATIVE_PATH = nodePath.join("C:", "Users", "sanir", ".codex", "sessions", "rollout-2026-03-31-019d4393.jsonl");
+
 const META = {
   sourceKind: "codex", sourceName: "Codex",
   targetKind: "claude", targetName: "Claude Code",
@@ -17,7 +22,7 @@ const META = {
 function sessionOf(text) {
   const body = Buffer.from(text, "utf8");
   return {
-    strategy: "file", nativePath: "C:\\x\\rollout-1.jsonl", body,
+    strategy: "file", nativePath: NATIVE_PATH, body,
     bytes: body.length, lines: text.split("\n").length - 1,
     sha256: "a".repeat(64), counts: null, readable: true,
   };
@@ -130,7 +135,7 @@ const { PER_RANGE, MAX_LISTED } = require("../lib/ranges.js");
 function bigSession(lines) {
   return {
     strategy: "file",
-    nativePath: "C:\\Users\\sanir\\.codex\\sessions\\rollout-2026-03-31-019d4393.jsonl",
+    nativePath: BIG_NATIVE_PATH,
     body: Buffer.alloc(0), bytes: 581_632, lines,
     sha256: "b".repeat(64), counts: null, readable: true,
   };
@@ -181,6 +186,66 @@ test("the reference prompt carries the same six rules as the inline one", () => 
   ]) {
     assert.ok(text.includes(rule), `missing rule: ${rule}`);
   }
+});
+
+const path = require("node:path");
+const { build } = require("../lib/briefing.js");
+
+function fileSessionOfSize(bytes) {
+  const line = '{"pad":"' + "x".repeat(98) + '"}\n';
+  const body = Buffer.from(line.repeat(Math.ceil(bytes / line.length)), "utf8");
+  return {
+    strategy: "file", nativePath: NATIVE_PATH, body,
+    bytes: body.length, lines: body.toString("utf8").split("\n").length - 1,
+    sha256: "c".repeat(64), counts: null, readable: true,
+  };
+}
+
+test("a small session is delivered inline", () => {
+  const built = build({ meta: META, session: fileSessionOfSize(2000) });
+  assert.equal(built.mode, "inline");
+  assert.deepEqual(built.markers, [SENTINEL]);
+});
+
+test("a large session switches to a reference, and says which file to look for", () => {
+  const built = build({ meta: META, session: fileSessionOfSize(400_000) });
+  assert.equal(built.mode, "reference");
+  assert.deepEqual(built.markers, [SENTINEL, "rollout-1.jsonl"]);
+});
+
+test("both modes stay under the prompt budget, and well under the hard ceiling", () => {
+  for (const bytes of [0, 1000, 20_000, 26_000, 30_000, 400_000, 14_000_000]) {
+    const built = build({ meta: META, session: fileSessionOfSize(bytes) });
+    assert.ok(built.text.length <= PROMPT_BUDGET,
+      `${bytes}-byte session produced a ${built.text.length}-char prompt`);
+    assert.ok(built.text.length < 32_767, "the hard argv ceiling must never be reached");
+  }
+});
+
+test("the boundary is decided on the assembled prompt, not on an estimate", () => {
+  // Walk the crossover and assert it is monotonic: once reference wins it never
+  // goes back to inline. A mis-measured budget shows up here as a flip-flop.
+  let seenReference = false;
+  for (let bytes = 20_000; bytes <= 32_000; bytes += 500) {
+    const mode = build({ meta: META, session: fileSessionOfSize(bytes) }).mode;
+    if (mode === "reference") seenReference = true;
+    else assert.equal(seenReference, false, `inline reappeared at ${bytes} bytes after reference`);
+  }
+  assert.equal(seenReference, true, "somewhere in that walk it must stop fitting");
+});
+
+test("an over-budget session that is not readable text yields no prompt at all", () => {
+  const s = fileSessionOfSize(400_000);
+  s.readable = false;
+  assert.equal(build({ meta: META, session: s }), null,
+    "the caller must report that complete context could not be retrieved");
+});
+
+test("an unreadable session that fits inline is still fine: the bytes travel in the prompt", () => {
+  const s = fileSessionOfSize(2000);
+  s.readable = false;
+  assert.equal(build({ meta: META, session: s }).mode, "inline",
+    "readability only matters when the target has to open the file itself");
 });
 
 test("briefing no longer offers the document-era API", () => {
