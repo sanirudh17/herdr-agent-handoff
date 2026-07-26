@@ -469,9 +469,11 @@ test("prose containing a quoted line is not mistaken for an input box", () => {
 test("closing the target mid-confirmation is not reported as a failure", async () => {
   const { env } = workspace();
   // The user read the result and closed the pane. The handoff worked; saying it
-  // failed would be a lie.
+  // failed would be a lie. The pane goes with the agent, which is what tells this
+  // apart from an agent that crashed and left its pane behind.
   env.HANDOFF_FAKE_FAIL = "agent read";
   env.HANDOFF_FAKE_ERROR_CODE = "agent_not_found";
+  env.HANDOFF_FAKE_PANE_GONE = "w5:p2";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, true);
   assert.equal(out.closed, true);
@@ -883,4 +885,19 @@ test("a banner above the input box explains a failure even though it did not del
   assert.equal(out.notReady, true);
   assert.equal(out.message, MESSAGES.notReady("Antigravity CLI"),
     "and it says it is still starting, not that it asked a question");
+});
+
+test("an agent that exits leaving its pane behind is reported, not passed over", async () => {
+  // Measured: opencode 1.18.5 crashes on startup on this machine and dumps a Bun
+  // crash report, leaving the shell prompt back in the pane. Treated as the user
+  // closing the pane, the handoff went silent and looked like it had done nothing.
+  const { env } = workspace();
+  env.HANDOFF_FAKE_FAIL = "agent read";          // the agent is gone
+  env.HANDOFF_FAKE_ERROR_CODE = "agent_not_found";
+  // `pane get` still answers, so the pane itself survived.
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, false);
+  assert.equal(out.agentExited, true);
+  assert.equal(out.message, MESSAGES.agentExited("Claude Code"));
 });

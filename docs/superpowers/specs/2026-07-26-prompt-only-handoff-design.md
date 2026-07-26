@@ -129,13 +129,37 @@ prompt therefore ends with a short fixed sentinel line — `-- end of handoff, b
 and that sentinel is the primary marker. It is the last thing submitted, so it is the last
 thing on screen.
 
-*Open risk, to be settled by live test (section 8).* Several TUIs collapse a large paste
-into a placeholder such as `[Pasted text #1 +612 lines]` rather than echoing it. If a real
-agent does that, neither the sentinel nor any other phrase from the prompt appears, and a
-delivered handoff would be reported as failed. If the live test shows this, mode 1 gains a
-second accepted proof: a paste-placeholder pattern on screen. It does **not** fall back to
-"the screen changed" or "the agent changed state" — both were tried on this branch and both
-announced handoffs that had not been delivered.
+**Settled by live test.** The risk was real, and worse than anticipated: `agent prompt`
+delivers a large multi-line prompt as a bracketed paste and *does not submit it*. Measured
+against every installed agent:
+
+| agent | what it does with a 7,000-character prompt |
+|---|---|
+| pi | submits it itself, echoes it in full; sentinel visible |
+| Claude Code | parks it at `❯ [Pasted text #1 +74 lines]`, **idle and unsent** 20 s later |
+| Codex | parks it at `› [Pasted Content 6999 chars]`, likewise unsent |
+| Grok | submits itself after ~4 s, then **truncates** its own transcript to `You 6:24 PM are taki …` |
+| Hermes | submits, echoes with `... (+70 more lines)`; sentinel visible |
+
+So delivery needs one Enter, and confirmation needs three different readings:
+
+1. **The sentinel on screen** — primary, unchanged.
+2. **One Enter, once, after a short grace period.** Spent only when nothing has happened,
+   because pi submits on its own and a stray Enter there would put an empty message into a
+   healthy handoff. Never spent on a target showing a question: Enter on a trust dialog
+   accepts its default.
+3. **The target being busy** — for agents like Grok that never put the prompt anywhere it
+   can be found. This is the one place a state counts as proof and it is fenced in: it
+   requires a transition the submission caused (an agent already working was working on
+   something else, and a settling agent moves in and out of working by itself), it requires
+   busy twice a persistence apart, and the screen must show neither a startup notice nor a
+   question. The two guard tests written for the original "a state change is never delivery"
+   lesson still pass unchanged.
+
+Marker matching also had to stop depending on line width. A narrow pane wraps mid-word, one
+character per line, so a capture reads `o m m i t t e d  w o r k s p a c e`; collapsing runs
+of whitespace was not enough, and a delivered handoff was reported as failed while the agent
+was visibly working on it. Matching now ignores whitespace entirely on both sides.
 
 ### 3.3 Mode 2 — point at the agent's own session file
 
@@ -182,9 +206,20 @@ This is the single place the plugin writes a file, and it is stated in the READM
 The alternative — refusing any opencode session over 26 KB — would remove working
 functionality, and 26 KB is below the median session in every store measured.
 
-*Assumption to verify live:* that opencode does not raise a permission dialog for a path
-inside its own data directory. If it does, the exception costs a click, which is
-acceptable per section 1, and nothing else changes.
+*Not verifiable on this machine.* opencode 1.18.5 crashes on startup here, dumping a Bun
+crash report (`bun.report/1.3.14/…`) and returning the shell prompt, so it cannot receive a
+handoff at all and the permission question could not be answered. The export path itself is
+covered by unit tests against a real SQLite store. Whether opencode prompts for a read
+inside its own data directory remains open; if it does, the exception costs a click, which
+is acceptable per section 1, and nothing else changes.
+
+That crash also exposed a reporting gap. A vanished target was always read as the user
+closing the pane — correct for that case, and deliberately silent, because the handoff had
+worked and saying otherwise would be a lie. But opencode leaves its *pane* behind with no
+agent in it, and reporting that as a deliberate close made a crashed launch look like a
+handoff that had silently done nothing. A pane that survives without its agent is now
+reported: `Handoff failed: opencode exited before accepting the handoff. Source pane
+untouched.`
 
 ## 5. Readiness: making the prompt-line rule real
 
@@ -291,6 +326,33 @@ is otherwise unchanged.
 - A guard test asserting each fixture round-trips through `readScreen` with its newlines
   intact. Since 5.3 makes `readScreen` return raw text, a fixture that lost its newlines
   would silently re-create the inert behaviour of `c6d1434`, and this is what catches that.
+
+## 8a. Live results
+
+Verified end to end through `handoff.run()`, prompt-only, nothing written:
+
+| target | mode | delivered | how it was confirmed |
+|---|---|---|---|
+| pi | inline, 6,992 ch | 11.9 s | sentinel echoed in full; began reading the plan doc |
+| Claude Code | inline, 7,005 ch | 11.7 s | one Enter, then sentinel; started running commands |
+| Codex | inline, 6,998 ch | 13.1 s | one Enter, then sentinel; acknowledged in one line and worked |
+| Codex | **reference**, 3,968 ch from a 16.29 MB / 4,726-line session | 13.2 s | one Enter, then sentinel; read the named file |
+| Hermes | inline, 7,006 ch | 37.5 s | sentinel visible past its `(+70 more lines)` elision |
+| Grok | inline, 6,996 ch | 41.2 s | busy fallback; context counter climbing, no echo to find |
+| Antigravity | inline | not delivered | its own account verification; reported as not-yet-ready |
+| opencode | inline | not delivered | crashes on startup here; reported as exited |
+
+Reference mode is the headline number: a 16.29 MB session became a 3,968-character prompt.
+
+Two agents did not deliver, and neither for a reason inside the plugin. Antigravity's screen
+says `We're finishing verifying your account eligibility. Please try again shortly.` while it
+discards input, and opencode 1.18.5 crashes before it can receive anything. Both are now
+reported accurately rather than as generic failures, and the source pane is untouched in both
+cases.
+
+One flake seen: pi's first launch in a fresh pane failed to accept the prompt once, then
+succeeded on every subsequent run. Its screen showed neither a startup notice nor a question,
+so the retry loop had nothing to act on. Not reproduced since; recorded rather than guessed at.
 
 ## 9. Limitations
 

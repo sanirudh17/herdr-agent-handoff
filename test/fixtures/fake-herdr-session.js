@@ -40,17 +40,38 @@ function ok(result) {
 const agent = process.env.HANDOFF_FAKE_AGENT || "";
 const session = JSON.parse(process.env.HANDOFF_FAKE_SESSION || "null");
 
-// Has a prompt been submitted to this pane yet? The recorded calls are the only
-// source of truth the fake has.
-function submittedTo(paneId) {
+// The recorded calls are the only source of truth the fake has about what has
+// happened so far.
+function anyCall(match) {
   if (!callsFile) return false;
   try {
     return fs.readFileSync(callsFile, "utf8").split("\n").filter(Boolean)
       .map((l) => JSON.parse(l))
-      .some((c) => c[0] === "agent" && c[1] === "prompt" && c[2] === paneId);
+      .some(match);
   } catch {
     return false;
   }
+}
+
+const submittedTo = (paneId) =>
+  anyCall((c) => c[0] === "agent" && c[1] === "prompt" && c[2] === paneId);
+const readAttempted = (paneId) =>
+  anyCall((c) => c[0] === "agent" && c[1] === "read" && c[2] === paneId);
+
+// HANDOFF_FAKE_PANE_GONE=<pane> models the user closing a pane: the pane itself is
+// gone, not merely the agent inside it. The distinction decides whether a vanished
+// target is a handoff the user moved on from or an agent that crashed.
+if (
+  argv[0] === "pane" && argv[1] === "get" &&
+  argv[2] === process.env.HANDOFF_FAKE_PANE_GONE &&
+  // Gone from the moment reads of it start failing, not before: the agent still has
+  // to be detected in the pane first, which happens through `pane get`.
+  readAttempted(argv[2])
+) {
+  process.stderr.write(
+    JSON.stringify({ error: { code: "pane_not_found", message: `pane ${argv[2]} not found` }, id: "cli:x" }) + "\n"
+  );
+  process.exit(1);
 }
 
 if (argv[0] === "pane" && argv[1] === "get") {
