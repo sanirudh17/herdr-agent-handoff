@@ -79,7 +79,7 @@ test("opencode returns a sqlite descriptor rather than a file", () => {
 
 test("non-integrated kinds are refused outright", () => {
   const home = tmpHome();
-  for (const agent of ["gemini", "agy", "cline", "kiro", "amp", "grok", "maki"]) {
+  for (const agent of ["gemini", "cline", "kiro", "amp", "grok", "maki"]) {
     assert.throws(
       () => resolve({ agent, sessionRef: { kind: "id", value: ID }, homedir: home, env: {} }),
       (err) => {

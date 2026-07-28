@@ -23,13 +23,13 @@ test("registry covers all 21 startable kinds", () => {
   assert.equal(new Set(kinds).size, 21, "kinds must be unique");
 });
 
-test("exactly the 14 session-reporting integrations can be sources", () => {
-  assert.equal(agents.SOURCE_KINDS.size, 14);
+test("exactly the 15 session-reporting integrations can be sources", () => {
+  assert.equal(agents.SOURCE_KINDS.size, 15);
   for (const k of ["claude", "codex", "copilot", "devin", "droid", "kimi", "omp", "mastracode",
-    "pi", "hermes", "opencode", "qodercli", "kilo", "cursor"]) {
+    "pi", "hermes", "opencode", "qodercli", "kilo", "cursor", "agy"]) {
     assert.ok(agents.SOURCE_KINDS.has(k), `${k} should be a source kind`);
   }
-  for (const k of ["gemini", "agy", "cline", "kiro", "amp", "grok", "maki"]) {
+  for (const k of ["gemini", "cline", "kiro", "amp", "grok", "maki"]) {
     assert.ok(!agents.SOURCE_KINDS.has(k), `${k} must not be a source kind`);
   }
 });

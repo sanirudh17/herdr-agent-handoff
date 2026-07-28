@@ -17,21 +17,22 @@ follow-up prompt to write.
 The source pane is never closed, interrupted, modified, or sent input.
 
 ```
-Handoff to Agent                                              7 / 21 available
+  installed (7)        not installed (14)             7 / 21 available
 
-pi · w5:p1 · 112 lines  →  new tab in workspace 5
+ pi in w5:p1 · 112 lines  →  new tab in workspace 5
 
-  ▸ Claude Code                   claude
-    Codex                         codex
-    pi                            pi            same agent, fresh session
-    Antigravity CLI               agy
-    Grok                          grok
-    Hermes Agent                  hermes
-    opencode                      opencode
+  ▸ Claude Code      claude
+    Codex            codex
+    pi               pi
+    Antigravity CLI  agy
+    Grok             grok
+    Hermes Agent     hermes
+    opencode         opencode
 
-  14 more supported agents not installed · ? to show
 
-  ↑↓ move · 1-9 jump · enter select · esc cancel
+
+
+  ↑↓ select · tab section                     ⏎ hand off   esc cancel
 ```
 
 ## Install
