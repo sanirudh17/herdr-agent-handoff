@@ -150,11 +150,11 @@ test("the reference prompt names the agent's own file and pins what to read", ()
   assert.ok(text.includes(s.sha256));
 });
 
-test("line ranges are enumerated in order and stop at the pinned last line", () => {
+test("the reference prompt names the file, pins line bounds, and omits range lists", () => {
   const text = renderReference({ meta: META, session: bigSession(3000) });
-  assert.ok(text.includes("1–1200"));
-  assert.ok(text.includes("1201–2400"));
-  assert.ok(text.includes("2401–3000"), "the last range ends at N, not at a round number");
+  assert.ok(text.includes("Read lines 1 to 3,000"), "pins the line count bound");
+  assert.ok(text.includes(BIG_NATIVE_PATH), "includes the native path");
+  assert.ok(!text.includes("1–1200"), "omits verbose line range enumerations");
 });
 
 test("reading past the pinned line is ruled out, because the file is live", () => {
@@ -162,11 +162,10 @@ test("reading past the pinned line is ruled out, because the file is live", () =
   assert.match(text, /do not read past line 3,000/i);
 });
 
-test("a very long session states the rule instead of listing every range", () => {
+test("a very long session states line bounds and stays under prompt budget", () => {
   const s = bigSession(PER_RANGE * (MAX_LISTED + 25));
   const text = renderReference({ meta: META, session: s });
-  assert.ok(!text.includes(`${PER_RANGE * (MAX_LISTED + 20)}`), "no unbounded enumeration");
-  assert.match(text, /each following 1,200 lines/i, "a stated rule takes over");
+  assert.match(text, /do not read past line/i);
   assert.ok(text.length < PROMPT_BUDGET, `reference prompt is ${text.length}, over budget`);
 });
 
@@ -254,3 +253,13 @@ test("briefing no longer offers the document-era API", () => {
   assert.equal(briefing.partsTable, undefined);
   assert.equal(briefing.render, undefined);
 });
+
+test("all agents receive the optimized, concise prompt layout", () => {
+  for (const kind of ["claude", "codex", "pi", "opencode", "grok", "hermes"]) {
+    const meta = { ...META, targetKind: kind, targetName: kind };
+    const prompt = renderInline({ meta, session: sessionOf('{"n":1}\n') });
+    assert.ok(prompt.length < 2500, `prompt for ${kind} should be under 2500 chars overhead`);
+    assert.ok(prompt.includes(SENTINEL));
+  }
+});
+

@@ -639,8 +639,8 @@ test("a slow-starting target is announced instead of leaving a silent pane", () 
   assert.match(MESSAGES.startingUp("Antigravity CLI"), /Antigravity CLI/);
 });
 
-test("Antigravity waits 7.5 seconds before the handoff prompt", () => {
-  assert.equal(timings({}).agySettle, 7500);
+test("Antigravity waits 10 seconds before the handoff prompt", () => {
+  assert.equal(timings({}).agySettle, 10000);
   assert.equal(timings({ HANDOFF_AGY_SETTLE_MS: "8000" }).agySettle, 8000);
 });
 
