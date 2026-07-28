@@ -6,6 +6,13 @@ description = "Transfer an in-progress session to a fresh session of another ins
 platforms = ["linux", "macos", "windows"]
 
 [[actions]]
+id = "handoff"
+title = "Handoff to agent"
+description = "Transfer the active agent session to a fresh agent beside it"
+contexts = ["pane"]
+command = ["node", "bin/handoff-split.js"]
+
+[[actions]]
 id = "handoff-split"
 title = "Handoff to agent (split)"
 description = "Transfer the active agent session to a fresh agent beside it"
