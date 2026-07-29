@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const ipc = require("../lib/ipc.js");
 const ui = require("../lib/ui.js");
+const updateMod = require("../lib/update.js");
 
 const HEADLESS = process.env.HANDOFF_PICKER_HEADLESS === "1";
 // How long the chosen agent stays on screen before the popup closes.
@@ -43,12 +44,14 @@ function loadRequest() {
 }
 
 function buildState(request) {
+  const notice = updateMod.checkUpdateAsync();
   return ui.initialState({
     contextLine: request.contextLine,
     destination: request.destination,
     installed: request.installed,
     notInstalled: request.notInstalled || [],
     theme: request.theme || null,
+    updateNotice: notice.available ? notice : null,
     // Use the pane's real size; the frame budgets every column from it so
     // nothing wraps, even in a 34-column popup.
     width: HEADLESS ? 78 : Math.max(24, process.stdout.columns || 78),
@@ -129,6 +132,9 @@ function runInteractive(request) {
         ? ui.applyClick(state, event.row, event.col)
         : ui.applyKey(state, event.name);
       state = out.state;
+      if (out.action && out.action.dismissUpdate) {
+        updateMod.dismissUpdate(out.action.dismissUpdate);
+      }
       if (out.action && out.action.select) {
         // Show the choice before the popup disappears, so the selection is
         // acknowledged rather than the modal just blinking out.
