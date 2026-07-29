@@ -73,3 +73,60 @@ test("checkUpdateAsync returns available when cached version is newer and not di
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("stale cache triggers a background probe but returns cached result", () => {
+  const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
+  const env = { HERDR_PLUGIN_STATE_DIR };
+  // Cache is 48 hours old — stale.
+  writeCache({ lastCheckUnix: Date.now() - 48 * 60 * 60 * 1000, latestVersion: "0.2.0" }, env);
+  const res = checkUpdateAsync(env);
+  // Should still return the cached result while the probe runs in background.
+  assert.deepEqual(res, { available: true, version: "0.2.0" });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("checkUpdateAsync returns false when latest version matches current", () => {
+  const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
+  const env = { HERDR_PLUGIN_STATE_DIR };
+  writeCache({ lastCheckUnix: Date.now(), latestVersion: CURRENT_VERSION }, env);
+  const res = checkUpdateAsync(env);
+  assert.deepEqual(res, { available: false });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("checkUpdateAsync returns false when latest version is older than current", () => {
+  const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
+  const env = { HERDR_PLUGIN_STATE_DIR };
+  writeCache({ lastCheckUnix: Date.now(), latestVersion: "0.0.1" }, env);
+  const res = checkUpdateAsync(env);
+  assert.deepEqual(res, { available: false });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("dismissing one version does not suppress a newer version", () => {
+  const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
+  const env = { HERDR_PLUGIN_STATE_DIR };
+
+  writeCache({ lastCheckUnix: Date.now(), latestVersion: "0.2.0" }, env);
+  dismissUpdate("0.2.0", env);
+  assert.deepEqual(checkUpdateAsync(env), { available: false });
+
+  // Simulate a new release appearing.
+  writeCache({ lastCheckUnix: Date.now(), latestVersion: "0.3.0" }, env);
+  const res = checkUpdateAsync(env);
+  assert.deepEqual(res, { available: true, version: "0.3.0" });
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("checkUpdateAsync returns false with no cache", () => {
+  const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
+  const env = { HERDR_PLUGIN_STATE_DIR };
+  const res = checkUpdateAsync(env);
+  assert.deepEqual(res, { available: false });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("CURRENT_VERSION is a valid semver string", () => {
+  assert.match(CURRENT_VERSION, /^\d+\.\d+\.\d+$/);
+});

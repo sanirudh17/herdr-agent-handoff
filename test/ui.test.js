@@ -439,3 +439,104 @@ test("the confirmation frame names the chosen agent", () => {
   assert.match(text, /handing off to Codex/);
   assert.match(text, /✓/);
 });
+
+// --- update notice --------------------------------------------------------
+
+test("update notice renders in the footer when available", () => {
+  const notice = { available: true, version: "0.2.0" };
+  const s = state({ updateNotice: notice });
+  const text = plain(s);
+  // At 78 columns the full notice (82 chars) does not fit, so the short form is used.
+  assert.match(text, /Update.*v0\.2\.0.*available/, "update notice text");
+  assert.match(text, /u dismiss/, "dismiss chip");
+  assert.ok(!text.includes("↑↓ select"), "normal footer hints are replaced");
+});
+
+test("update notice is dismissible with the u key", () => {
+  const notice = { available: true, version: "0.2.0" };
+  let s = state({ updateNotice: notice });
+  assert.ok(s.updateNotice, "notice starts present");
+  const out = ui.applyKey(s, "u");
+  assert.equal(out.state.updateNotice, null, "notice cleared after u");
+  assert.deepEqual(out.action, { dismissUpdate: "0.2.0" });
+});
+
+test("update notice is dismissible with uppercase U", () => {
+  const notice = { available: true, version: "0.2.0" };
+  const out = ui.applyKey(state({ updateNotice: notice }), "U");
+  assert.equal(out.state.updateNotice, null);
+  assert.deepEqual(out.action, { dismissUpdate: "0.2.0" });
+});
+
+test("u key does nothing when there is no update notice", () => {
+  const out = ui.applyKey(state(), "u");
+  assert.equal(out.action, null, "no action when no notice");
+});
+
+test("normal footer renders when update notice is absent", () => {
+  const text = plain(state());
+  assert.match(text, /↑↓ select/, "normal hints present");
+  assert.match(text, /⏎ hand off/, "hand-off chip present");
+  assert.ok(!text.includes("Update available"), "no update notice");
+});
+
+test("normal footer renders when update notice is null", () => {
+  const text = plain(state({ updateNotice: null }));
+  assert.match(text, /↑↓ select/);
+  assert.ok(!text.includes("Update available"));
+});
+
+test("short notice fallback fits narrow panes", () => {
+  const notice = { available: true, version: "0.2.0" };
+  // 40 columns: full notice (82 chars) does not fit, short notice (25 chars) + dismiss fits.
+  const s = state({ width: 40, updateNotice: notice });
+  const frame = ui.renderFrame(s);
+  const footer = frame[frame.length - 1];
+  assert.match(footer, /Update v0\.2\.0 available/, "short notice");
+  assert.match(footer, /u dismiss/, "dismiss chip still present");
+  assert.ok(footer.length <= 40, `footer must fit: ${footer.length} chars`);
+});
+
+test("truncated notice fallback for very narrow panes", () => {
+  const notice = { available: true, version: "0.2.0" };
+  // 24 columns (minimum): short notice + dismiss (38 chars) does not fit, truncated.
+  const s = state({ width: 24, updateNotice: notice });
+  const text = plain(s);
+  const footer = text.split("\n").pop();
+  assert.ok(footer.length <= 24, `footer must fit: ${footer.length} chars`);
+  assert.ok(footer.includes("Update"), "truncated notice still mentions update");
+});
+
+test("update notice never wraps at any width", () => {
+  const notice = { available: true, version: "0.2.0" };
+  for (const width of [22, 34, 40, 56, 78, 120]) {
+    const frame = ui.renderFrame(state({ width, updateNotice: notice }));
+    for (const line of frame) {
+      assert.ok(
+        line.length <= Math.max(24, width),
+        `width ${width}: line of ${line.length} chars would wrap: ${JSON.stringify(line)}`
+      );
+    }
+  }
+});
+
+test("full frame shows update notice alongside agent list", () => {
+  const notice = { available: true, version: "0.2.0" };
+  const text = plain(state({ updateNotice: notice }));
+  // Agent list is still visible.
+  assert.match(text, /Claude Code/);
+  assert.match(text, /Codex/);
+  // Update notice is in the footer (short form at78 columns).
+  assert.match(text, /Update.*v0\.2\.0.*available/);
+});
+
+test("dismissing update restores normal footer in next render", () => {
+  const notice = { available: true, version: "0.2.0" };
+  let s = state({ updateNotice: notice });
+  assert.match(plain(s), /Update.*available/, "notice shown initially");
+  ({ state: s } = ui.applyKey(s, "u"));
+  // After dismissal, state has no notice — render should show normal footer.
+  const text = plain(s);
+  assert.ok(!text.includes("Update"), "notice gone after dismiss");
+  assert.match(text, /↑↓ select/, "normal hints restored");
+});
