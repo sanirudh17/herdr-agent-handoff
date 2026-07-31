@@ -34,10 +34,29 @@ test("exactly the 15 session-reporting integrations can be sources", () => {
   }
 });
 
-test("every agent has a friendly name and at least one executable candidate", () => {
+test("every agent has a friendly name, executable candidate, and explicit handoff permission mode", () => {
   for (const a of agents.AGENTS) {
     assert.ok(a.name && a.name.length > 0, `${a.kind} needs a name`);
     assert.ok(Array.isArray(a.exec) && a.exec.length > 0, `${a.kind} needs exec candidates`);
+    assert.ok(Array.isArray(a.yoloArgs), `${a.kind} needs explicit YOLO arguments`);
+  }
+});
+
+test("handoff YOLO arguments use each agent's documented CLI spelling", () => {
+  const args = (kind) => agents.byKind(kind).yoloArgs;
+  assert.deepEqual(args("claude"), ["--dangerously-skip-permissions"]);
+  assert.deepEqual(args("codex"), ["--yolo"]);
+  // opencode's permissions already default to allow, so it needs no switch.
+  assert.deepEqual(args("opencode"), []);
+  assert.deepEqual(args("cline"), ["--auto-approve", "true"]);
+  assert.deepEqual(args("copilot"), ["--allow-all-tools"]);
+  assert.deepEqual(args("cursor"), ["--yolo"]);
+  assert.deepEqual(args("gemini"), ["--yolo"]);
+  assert.deepEqual(args("pi"), []);
+  assert.deepEqual(args("amp"), []);
+  // The rest of the startable roster runs in documented bypass/YOLO mode.
+  for (const kind of ["agy", "devin", "droid", "grok", "kilo", "kimi", "omp"]) {
+    assert.deepEqual(args(kind), ["--yolo"], `${kind} should run in YOLO mode`);
   }
 });
 

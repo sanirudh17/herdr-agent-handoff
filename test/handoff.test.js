@@ -182,7 +182,7 @@ test("split handoff splits beside the source, starts, prompts, focuses and notif
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: pi → Claude Code (split)");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  const order = ["pane split", "agent start", "agent prompt", "agent focus", "notification show"];
+  const order = ["pane split", "pane run", "agent prompt", "agent focus", "notification show"];
   let cursor = -1;
   for (const step of order) {
     const at = argv.findIndex((a, i) => i > cursor && a.startsWith(step));
@@ -247,13 +247,13 @@ test("a failed target creation reports and creates no agent", async () => {
   assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "start"));
 });
 
-test("a failed agent start reports and does not prompt", async () => {
+test("a failed native agent start reports and does not prompt", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "native";
   env.HANDOFF_FAKE_FAIL = "agent start";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "pi" } });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.startFailed("Claude Code"));
+  assert.equal(out.message, MESSAGES.startFailed("pi"));
   assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"));
 });
 
@@ -664,17 +664,17 @@ test("a shell running something else is not at its prompt", () => {
   assert.equal(shellIsAtPrompt(null), false);
 });
 
-test("agent start is used where it works", async () => {
+test("agent start is used where no launch arguments are needed", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "native";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "pi" } });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
   assert.ok(argv.some((a) => a.startsWith("agent start")), "should use the documented path");
   assert.ok(!argv.some((a) => a.startsWith("pane run")), "no need for the workaround");
 });
 
-test("the Windows workaround launches the agent through the pane shell", async () => {
+test("the pane-shell launch includes Claude's bypass-permissions argument", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "pane-run";
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
@@ -684,7 +684,10 @@ test("the Windows workaround launches the agent through the pane shell", async (
     !argv.some((a) => a.startsWith("agent start")),
     "agent start renders an empty -ArgumentList on Windows and must be avoided"
   );
-  assert.ok(argv.some((a) => a === "pane run w5:p2 claude"), `got ${JSON.stringify(argv)}`);
+  assert.ok(
+    argv.some((a) => a === "pane run w5:p2 claude --dangerously-skip-permissions"),
+    `got ${JSON.stringify(argv)}`
+  );
   assert.ok(argv.some((a) => a.startsWith("agent wait w5:p2")), "must wait for readiness");
   assert.ok(argv.some((a) => a.startsWith("agent prompt w5:p2")), "prompt addresses the pane");
 });
@@ -698,11 +701,11 @@ test("Antigravity starts without TERM in a Windows Herdr pane", async () => {
   assert.equal(out.ok, true);
 
   const argv = readCalls(calls).map((c) => c.join(" "));
-  const command = "pane run w5:p2 $env:TERM=''; agy";
+  const command = "pane run w5:p2 $env:TERM=''; agy --yolo";
   if (process.platform === "win32") {
     assert.ok(argv.some((a) => a === command), `got ${JSON.stringify(argv)}`);
   } else {
-    assert.ok(argv.some((a) => a === "pane run w5:p2 agy"), `got ${JSON.stringify(argv)}`);
+    assert.ok(argv.some((a) => a === "pane run w5:p2 agy --yolo"), `got ${JSON.stringify(argv)}`);
   }
 });
 
@@ -714,7 +717,7 @@ test("the workaround uses the executable name that actually resolved", async () 
   const out = await run({ destination: "split", env, pickerChoice: { selected: "cursor" } });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a === "pane run w5:p2 cursor-agent"), `got ${JSON.stringify(argv)}`);
+  assert.ok(argv.some((a) => a === "pane run w5:p2 cursor-agent --yolo"), `got ${JSON.stringify(argv)}`);
 });
 
 // opencode's only store is a single database with no per-session files, verified
