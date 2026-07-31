@@ -54,8 +54,13 @@ test("handoff YOLO arguments use each agent's documented CLI spelling", () => {
   assert.deepEqual(args("gemini"), ["--yolo"]);
   assert.deepEqual(args("pi"), []);
   assert.deepEqual(args("amp"), []);
-  // The rest of the startable roster runs in documented bypass/YOLO mode.
-  for (const kind of ["agy", "devin", "droid", "grok", "kilo", "kimi", "omp"]) {
+  // Pi and OMP have no approval layer at all, so nothing to skip.
+  assert.deepEqual(args("agy"), ["--dangerously-skip-permissions"]);
+  assert.deepEqual(args("devin"), ["--permission-mode", "yolo"]);
+  assert.deepEqual(args("droid"), ["--skip-permissions-unsafe"]);
+  assert.deepEqual(args("kilo"), ["--auto"]);
+  // The rest of the startable roster runs in documented YOLO mode.
+  for (const kind of ["grok", "hermes", "kimi", "kiro", "maki", "mastracode", "qodercli"]) {
     assert.deepEqual(args(kind), ["--yolo"], `${kind} should run in YOLO mode`);
   }
 });

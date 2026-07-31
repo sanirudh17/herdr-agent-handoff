@@ -701,11 +701,11 @@ test("Antigravity starts without TERM in a Windows Herdr pane", async () => {
   assert.equal(out.ok, true);
 
   const argv = readCalls(calls).map((c) => c.join(" "));
-  const command = "pane run w5:p2 $env:TERM=''; agy --yolo";
+  const command = "pane run w5:p2 $env:TERM=''; agy --dangerously-skip-permissions";
   if (process.platform === "win32") {
     assert.ok(argv.some((a) => a === command), `got ${JSON.stringify(argv)}`);
   } else {
-    assert.ok(argv.some((a) => a === "pane run w5:p2 agy --yolo"), `got ${JSON.stringify(argv)}`);
+    assert.ok(argv.some((a) => a === "pane run w5:p2 agy --dangerously-skip-permissions"), `got ${JSON.stringify(argv)}`);
   }
 });
 

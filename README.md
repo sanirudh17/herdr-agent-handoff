@@ -165,22 +165,22 @@ does not write or change any agent configuration files:
 | `claude` | `claude --dangerously-skip-permissions` |
 | `codex` | `codex --yolo` (no sandbox, no approvals) |
 | `pi` | `pi` — no built-in approval layer |
-| `agy` | `agy --yolo` |
+| `agy` | `agy --dangerously-skip-permissions` |
 | `amp` | `amp` — approval-free by default |
 | `cline` | `cline --auto-approve true` |
 | `copilot` | `copilot --allow-all-tools` |
 | `cursor` | `cursor-agent --yolo` |
-| `devin` | `devin --yolo` |
-| `droid` | `droid --yolo` |
+| `devin` | `devin --permission-mode yolo` |
+| `droid` | `droid --skip-permissions-unsafe` |
 | `gemini` | `gemini --yolo` |
 | `grok` | `grok --yolo` |
 | `hermes` | `hermes --yolo` |
-| `kilo` | `kilo --yolo` |
+| `kilo` | `kilo --auto` (autonomous, no prompts) |
 | `kimi` | `kimi --yolo` |
 | `kiro` | `kiro --yolo` |
 | `maki` | `maki --yolo` |
 | `mastracode` | `mastracode --yolo` |
-| `omp` | `omp --yolo` |
+| `omp` | `omp` — no approval layer (Pi fork) |
 | `opencode` | `opencode` — permissions already default to allow |
 | `qodercli` | `qodercli --yolo` |
 
