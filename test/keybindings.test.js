@@ -78,6 +78,33 @@ test("patch replaces a stale block rather than duplicating it", () => {
   assert.ok(!out.text.includes('key = "prefix+z"'));
 });
 
+test("patch removes an obsolete agent-handoff key even when current keys exist", () => {
+  const config = [
+    '[[keys.command]]',
+    'key = "prefix+a"',
+    'type = "plugin_action"',
+    'command = "agent-handoff.handoff-split"',
+    "",
+    '[[keys.command]]',
+    'key = "ctrl+a"',
+    'type = "plugin_action"',
+    'command = "agent-handoff.handoff-split"',
+    "",
+    '[[keys.command]]',
+    'key = "prefix+shift+a"',
+    'type = "plugin_action"',
+    'command = "agent-handoff.handoff-tab"',
+    "",
+  ].join("\n");
+  const out = kb.patch(config);
+  assert.equal(out.changed, true);
+  assert.ok(!out.text.includes('key = "ctrl+a"'));
+  assert.deepEqual(
+    [...out.text.matchAll(/key = "([^"]+)"/g)].map((match) => match[1]),
+    ["prefix+a", "prefix+shift+a"]
+  );
+});
+
 test("findConfigPath prefers HERDR_CONFIG_PATH", () => {
   const p = path.join(path.sep, "custom", "config.toml");
   assert.equal(kb.findConfigPath({ env: { HERDR_CONFIG_PATH: p }, helpOutput: "" }), p);
