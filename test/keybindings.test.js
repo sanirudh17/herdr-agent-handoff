@@ -27,6 +27,13 @@ test("patch is idempotent", () => {
   assert.equal((twice.text.match(/handoff-split/g) || []).length, 1);
 });
 
+test("patch preserves CRLF when keybindings are already current", () => {
+  const config = kb.patch("").text.replace(/\n/g, "\r\n");
+  const out = kb.patch(config);
+  assert.equal(out.changed, false);
+  assert.equal(out.text, config);
+});
+
 test("patch preserves existing config content", () => {
   const existing = '[theme]\nname = "nord"\n';
   const out = kb.patch(existing);
