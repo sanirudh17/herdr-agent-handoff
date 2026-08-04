@@ -21,8 +21,18 @@ function tmpEnv() {
 }
 
 test("parseVersion extracts semver correctly", () => {
-  assert.deepEqual(parseVersion("0.1.0"), { major: 0, minor: 1, patch: 0, raw: "0.1.0" });
-  assert.deepEqual(parseVersion("v1.2.3"), { major: 1, minor: 2, patch: 3, raw: "1.2.3" });
+  assert.deepEqual(parseVersion("0.1.0"), {
+    major: 0,
+    minor: 1,
+    patch: 0,
+    raw: "0.1.0",
+  });
+  assert.deepEqual(parseVersion("v1.2.3"), {
+    major: 1,
+    minor: 2,
+    patch: 3,
+    raw: "1.2.3",
+  });
   assert.equal(parseVersion("invalid"), null);
 });
 
@@ -78,7 +88,10 @@ test("stale cache triggers a background probe but returns cached result", () => 
   const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
   const env = { HERDR_PLUGIN_STATE_DIR };
   // Cache is 48 hours old — stale.
-  writeCache({ lastCheckUnix: Date.now() - 48 * 60 * 60 * 1000, latestVersion: "0.2.0" }, env);
+  writeCache(
+    { lastCheckUnix: Date.now() - 48 * 60 * 60 * 1000, latestVersion: "0.2.0" },
+    env,
+  );
   const res = checkUpdateAsync(env);
   // Should still return the cached result while the probe runs in background.
   assert.deepEqual(res, { available: true, version: "0.2.0" });
@@ -88,7 +101,10 @@ test("stale cache triggers a background probe but returns cached result", () => 
 test("checkUpdateAsync returns false when latest version matches current", () => {
   const { HERDR_PLUGIN_STATE_DIR, dir } = tmpEnv();
   const env = { HERDR_PLUGIN_STATE_DIR };
-  writeCache({ lastCheckUnix: Date.now(), latestVersion: CURRENT_VERSION }, env);
+  writeCache(
+    { lastCheckUnix: Date.now(), latestVersion: CURRENT_VERSION },
+    env,
+  );
   const res = checkUpdateAsync(env);
   assert.deepEqual(res, { available: false });
   fs.rmSync(dir, { recursive: true, force: true });

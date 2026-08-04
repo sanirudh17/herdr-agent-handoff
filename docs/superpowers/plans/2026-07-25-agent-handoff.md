@@ -29,6 +29,7 @@
 ### Task 1: Project scaffold and plugin manifest
 
 **Files:**
+
 - Create: `package.json`
 - Create: `herdr-plugin.toml`
 - Create: `.gitignore`
@@ -36,6 +37,7 @@
 - Test: `test/paths.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `lib/paths.js` exporting `stateDir(): string`, `configDir(): string`, `handoffsDir(): string`, `requestsDir(): string`. All return absolute paths and create nothing.
 
@@ -191,11 +193,13 @@ git commit -m "feat: scaffold agent-handoff plugin with manifest and path helper
 ### Task 2: Herdr CLI wrapper
 
 **Files:**
+
 - Create: `lib/herdr.js`
 - Test: `test/herdr.test.js`
 - Test fixture: `test/fixtures/fake-herdr.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `lib/herdr.js` exporting:
   - `class HerdrCliError extends Error` with fields `code: string|null`, `stderr: string`.
@@ -214,7 +218,10 @@ const args = process.argv.slice(2);
 
 if (args[0] === "fail-envelope") {
   process.stdout.write(
-    JSON.stringify({ error: { code: "pane_not_found", message: "pane w99:p99 not found" }, id: "cli:pane:get" }) + "\n"
+    JSON.stringify({
+      error: { code: "pane_not_found", message: "pane w99:p99 not found" },
+      id: "cli:pane:get",
+    }) + "\n",
   );
   process.exit(1);
 }
@@ -234,7 +241,9 @@ if (args[0] === "plain") {
   process.exit(0);
 }
 
-process.stdout.write(JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) + "\n");
+process.stdout.write(
+  JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) + "\n",
+);
 process.exit(0);
 ```
 
@@ -269,16 +278,22 @@ test("run throws HerdrCliError carrying the envelope code and message", () => {
       assert.equal(err.code, "pane_not_found");
       assert.match(err.message, /pane w99:p99 not found/);
       return true;
-    }
+    },
   );
 });
 
 test("run throws on non-zero exit with unparseable output", () => {
-  assert.throws(() => run([FAKE, "fail-garbage"], { env: fakeEnv }), HerdrCliError);
+  assert.throws(
+    () => run([FAKE, "fail-garbage"], { env: fakeEnv }),
+    HerdrCliError,
+  );
 });
 
 test("run throws when json is expected but output is not JSON", () => {
-  assert.throws(() => run([FAKE, "ok-garbage"], { env: fakeEnv }), HerdrCliError);
+  assert.throws(
+    () => run([FAKE, "ok-garbage"], { env: fakeEnv }),
+    HerdrCliError,
+  );
 });
 
 test("run with json:false returns raw stdout", () => {
@@ -288,8 +303,11 @@ test("run with json:false returns raw stdout", () => {
 
 test("run throws when the binary cannot be executed", () => {
   assert.throws(
-    () => run(["x"], { env: { HERDR_BIN_PATH: path.join(__dirname, "no-such-binary-xyz") } }),
-    HerdrCliError
+    () =>
+      run(["x"], {
+        env: { HERDR_BIN_PATH: path.join(__dirname, "no-such-binary-xyz") },
+      }),
+    HerdrCliError,
   );
 });
 ```
@@ -324,7 +342,9 @@ function binPath(env = process.env) {
 }
 
 function lastJsonLine(text) {
-  const lines = String(text).split(/\r?\n/).filter((l) => l.trim() !== "");
+  const lines = String(text)
+    .split(/\r?\n/)
+    .filter((l) => l.trim() !== "");
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     try {
       return JSON.parse(lines[i]);
@@ -359,14 +379,16 @@ function run(args, opts = {}) {
   if (res.status !== 0) {
     throw new HerdrCliError(
       `herdr ${args.join(" ")} exited with status ${res.status}`,
-      { stderr }
+      { stderr },
     );
   }
 
   if (!json) return stdout;
 
   if (!envelope || envelope.result === undefined) {
-    throw new HerdrCliError(`herdr ${args.join(" ")} returned no JSON result`, { stderr });
+    throw new HerdrCliError(`herdr ${args.join(" ")} returned no JSON result`, {
+      stderr,
+    });
   }
 
   return envelope.result;
@@ -392,10 +414,12 @@ git commit -m "feat: add Herdr CLI wrapper with envelope error handling"
 ### Task 3: Agent registry and availability detection
 
 **Files:**
+
 - Create: `lib/agents.js`
 - Test: `test/agents.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `lib/agents.js` exporting:
   - `AGENTS: Array<{kind: string, name: string, exec: string[]}>` — all 21 kinds, in display order.
@@ -419,7 +443,8 @@ const agents = require("../lib/agents.js");
 
 function tempPathDir(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-path-"));
-  for (const name of files) fs.writeFileSync(path.join(dir, name), "#!/bin/sh\n", { mode: 0o755 });
+  for (const name of files)
+    fs.writeFileSync(path.join(dir, name), "#!/bin/sh\n", { mode: 0o755 });
   return dir;
 }
 
@@ -427,9 +452,29 @@ test("registry covers all 21 startable kinds", () => {
   assert.equal(agents.AGENTS.length, 21);
   assert.equal(agents.TOTAL_COUNT, 21);
   const kinds = agents.AGENTS.map((a) => a.kind);
-  for (const k of ["pi", "claude", "codex", "gemini", "cursor", "devin", "agy", "cline", "omp",
-    "mastracode", "opencode", "copilot", "kimi", "kiro", "droid", "amp", "grok", "hermes",
-    "kilo", "qodercli", "maki"]) {
+  for (const k of [
+    "pi",
+    "claude",
+    "codex",
+    "gemini",
+    "cursor",
+    "devin",
+    "agy",
+    "cline",
+    "omp",
+    "mastracode",
+    "opencode",
+    "copilot",
+    "kimi",
+    "kiro",
+    "droid",
+    "amp",
+    "grok",
+    "hermes",
+    "kilo",
+    "qodercli",
+    "maki",
+  ]) {
     assert.ok(kinds.includes(k), `missing kind ${k}`);
   }
   assert.equal(new Set(kinds).size, 21, "kinds must be unique");
@@ -437,8 +482,23 @@ test("registry covers all 21 startable kinds", () => {
 
 test("exactly the 15 integrated agents can be sources", () => {
   assert.equal(agents.SOURCE_KINDS.size, 15);
-  for (const k of ["claude", "codex", "copilot", "devin", "droid", "kimi", "omp", "mastracode",
-    "pi", "hermes", "opencode", "qodercli", "kilo", "cursor", "grok"]) {
+  for (const k of [
+    "claude",
+    "codex",
+    "copilot",
+    "devin",
+    "droid",
+    "kimi",
+    "omp",
+    "mastracode",
+    "pi",
+    "hermes",
+    "opencode",
+    "qodercli",
+    "kilo",
+    "cursor",
+    "grok",
+  ]) {
     assert.ok(agents.SOURCE_KINDS.has(k), `${k} should be a source kind`);
   }
   for (const k of ["gemini", "agy", "cline", "kiro", "amp", "maki"]) {
@@ -449,7 +509,10 @@ test("exactly the 15 integrated agents can be sources", () => {
 test("every agent has a friendly name and at least one executable candidate", () => {
   for (const a of agents.AGENTS) {
     assert.ok(a.name && a.name.length > 0, `${a.kind} needs a name`);
-    assert.ok(Array.isArray(a.exec) && a.exec.length > 0, `${a.kind} needs exec candidates`);
+    assert.ok(
+      Array.isArray(a.exec) && a.exec.length > 0,
+      `${a.kind} needs exec candidates`,
+    );
   }
 });
 
@@ -468,23 +531,42 @@ test("resolveExecutable finds a plain executable on PATH", () => {
 });
 
 // PATHEXT resolution only applies on Windows, so these two are Windows-only.
-const winOnly = { skip: process.platform !== "win32" ? "Windows-only behaviour" : false };
+const winOnly = {
+  skip: process.platform !== "win32" ? "Windows-only behaviour" : false,
+};
 
-test("resolveExecutable honours PATHEXT for Windows-style shims", winOnly, () => {
-  const dir = tempPathDir(["claude.cmd"]);
-  const found = agents.resolveExecutable("claude", { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" });
-  assert.equal(found, path.join(dir, "claude.cmd"));
-});
+test(
+  "resolveExecutable honours PATHEXT for Windows-style shims",
+  winOnly,
+  () => {
+    const dir = tempPathDir(["claude.cmd"]);
+    const found = agents.resolveExecutable("claude", {
+      PATH: dir,
+      PATHEXT: ".COM;.EXE;.CMD",
+    });
+    assert.equal(found, path.join(dir, "claude.cmd"));
+  },
+);
 
-test("resolveExecutable also matches .ps1 shims absent from PATHEXT", winOnly, () => {
-  const dir = tempPathDir(["pi.ps1"]);
-  const found = agents.resolveExecutable("pi", { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" });
-  assert.equal(found, path.join(dir, "pi.ps1"));
-});
+test(
+  "resolveExecutable also matches .ps1 shims absent from PATHEXT",
+  winOnly,
+  () => {
+    const dir = tempPathDir(["pi.ps1"]);
+    const found = agents.resolveExecutable("pi", {
+      PATH: dir,
+      PATHEXT: ".COM;.EXE;.CMD",
+    });
+    assert.equal(found, path.join(dir, "pi.ps1"));
+  },
+);
 
 test("resolveExecutable returns null when nothing matches", () => {
   const dir = tempPathDir([]);
-  assert.equal(agents.resolveExecutable("claude", { PATH: dir, PATHEXT: "" }), null);
+  assert.equal(
+    agents.resolveExecutable("claude", { PATH: dir, PATHEXT: "" }),
+    null,
+  );
 });
 
 test("available reports only agents whose executable resolves, first candidate wins", () => {
@@ -492,7 +574,10 @@ test("available reports only agents whose executable resolves, first candidate w
   const list = agents.available({ PATH: dir, PATHEXT: "" });
   const kinds = list.map((a) => a.kind);
   assert.deepEqual(kinds.sort(), ["claude", "cursor"]);
-  assert.equal(list.find((a) => a.kind === "cursor").executable, path.join(dir, "cursor-agent"));
+  assert.equal(
+    list.find((a) => a.kind === "cursor").executable,
+    path.join(dir, "cursor-agent"),
+  );
 });
 ```
 
@@ -517,11 +602,19 @@ const AGENTS = [
   { kind: "claude", name: "Claude Code", exec: ["claude"] },
   { kind: "codex", name: "Codex", exec: ["codex"] },
   { kind: "pi", name: "pi", exec: ["pi"] },
-  { kind: "agy", name: "Antigravity CLI", exec: ["agy", "antigravity", "antigravity-cli"] },
+  {
+    kind: "agy",
+    name: "Antigravity CLI",
+    exec: ["agy", "antigravity", "antigravity-cli"],
+  },
   { kind: "amp", name: "Amp", exec: ["amp"] },
   { kind: "cline", name: "Cline", exec: ["cline"] },
   { kind: "copilot", name: "GitHub Copilot CLI", exec: ["copilot"] },
-  { kind: "cursor", name: "Cursor Agent CLI", exec: ["cursor-agent", "cursor"] },
+  {
+    kind: "cursor",
+    name: "Cursor Agent CLI",
+    exec: ["cursor-agent", "cursor"],
+  },
   { kind: "devin", name: "Devin CLI", exec: ["devin"] },
   { kind: "droid", name: "Droid", exec: ["droid"] },
   { kind: "gemini", name: "Gemini CLI (deprecated)", exec: ["gemini"] },
@@ -542,8 +635,21 @@ const TOTAL_COUNT = AGENTS.length;
 // Mirrors is_official_agent_source() in Herdr's src/agent_resume.rs. Only these
 // agents ever report a native session reference, so only these can be sources.
 const SOURCE_KINDS = new Set([
-  "claude", "codex", "copilot", "devin", "droid", "kimi", "omp", "mastracode",
-  "pi", "hermes", "opencode", "qodercli", "kilo", "cursor", "grok",
+  "claude",
+  "codex",
+  "copilot",
+  "devin",
+  "droid",
+  "kimi",
+  "omp",
+  "mastracode",
+  "pi",
+  "hermes",
+  "opencode",
+  "qodercli",
+  "kilo",
+  "cursor",
+  "grok",
 ]);
 
 function byKind(kind) {
@@ -566,7 +672,9 @@ function extensionCandidates(env) {
 }
 
 function resolveExecutable(name, env = process.env) {
-  const dirs = String(env.PATH || "").split(path.delimiter).filter(Boolean);
+  const dirs = String(env.PATH || "")
+    .split(path.delimiter)
+    .filter(Boolean);
   const exts = extensionCandidates(env);
   for (const dir of dirs) {
     for (const ext of exts) {
@@ -595,7 +703,14 @@ function available(env = process.env) {
   return out;
 }
 
-module.exports = { AGENTS, TOTAL_COUNT, SOURCE_KINDS, byKind, resolveExecutable, available };
+module.exports = {
+  AGENTS,
+  TOTAL_COUNT,
+  SOURCE_KINDS,
+  byKind,
+  resolveExecutable,
+  available,
+};
 ```
 
 Note: `extensionCandidates` branches on `process.platform`, which is why the two shim tests above carry the `winOnly` skip — on POSIX the only candidate extension is `""`, so `claude.cmd` would never resolve for the name `claude`.
@@ -617,10 +732,12 @@ git commit -m "feat: add agent registry with cross-platform availability detecti
 ### Task 4: Source resolution — file strategy
 
 **Files:**
+
 - Create: `lib/sources.js`
 - Test: `test/sources.test.js`
 
 **Interfaces:**
+
 - Consumes: `lib/agents.js` (`SOURCE_KINDS`).
 - Produces: `lib/sources.js` exporting:
   - `class SourceContextUnavailable extends Error` with field `reason: string`.
@@ -657,7 +774,12 @@ const BODY = '{"a":1}\n{"b":2}\n';
 test("kind:path is used directly without searching", () => {
   const home = tmpHome();
   const file = writeFile(path.join(home, "anywhere", "session.jsonl"), BODY);
-  const got = resolve({ agent: "pi", sessionRef: { kind: "path", value: file }, homedir: home, env: {} });
+  const got = resolve({
+    agent: "pi",
+    sessionRef: { kind: "path", value: file },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.strategy, "file");
   assert.equal(got.path, file);
   assert.equal(got.lines, 2);
@@ -666,8 +788,16 @@ test("kind:path is used directly without searching", () => {
 
 test("claude resolves <id>.jsonl under any project directory", () => {
   const home = tmpHome();
-  const file = writeFile(path.join(home, ".claude", "projects", "C--Users-x-proj", `${ID}.jsonl`), BODY);
-  const got = resolve({ agent: "claude", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
+  const file = writeFile(
+    path.join(home, ".claude", "projects", "C--Users-x-proj", `${ID}.jsonl`),
+    BODY,
+  );
+  const got = resolve({
+    agent: "claude",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.path, file);
 });
 
@@ -676,7 +806,9 @@ test("claude honours CLAUDE_CONFIG_DIR", () => {
   const alt = tmpHome();
   const file = writeFile(path.join(alt, "projects", "p", `${ID}.jsonl`), BODY);
   const got = resolve({
-    agent: "claude", sessionRef: { kind: "id", value: ID }, homedir: home,
+    agent: "claude",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
     env: { CLAUDE_CONFIG_DIR: alt },
   });
   assert.equal(got.path, file);
@@ -685,36 +817,92 @@ test("claude honours CLAUDE_CONFIG_DIR", () => {
 test("codex resolves rollout-<date>-<id>.jsonl under nested date directories", () => {
   const home = tmpHome();
   const file = writeFile(
-    path.join(home, ".codex", "sessions", "2026", "07", "10", `rollout-2026-07-10T16-46-08-${ID}.jsonl`),
-    BODY
+    path.join(
+      home,
+      ".codex",
+      "sessions",
+      "2026",
+      "07",
+      "10",
+      `rollout-2026-07-10T16-46-08-${ID}.jsonl`,
+    ),
+    BODY,
   );
-  const got = resolve({ agent: "codex", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
+  const got = resolve({
+    agent: "codex",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.path, file);
 });
 
 test("pi resolves <timestamp>_<id>.jsonl", () => {
   const home = tmpHome();
   const file = writeFile(
-    path.join(home, ".pi", "agent", "sessions", "--C--proj--", `2026-07-24T17-10-59-546Z_${ID}.jsonl`),
-    BODY
+    path.join(
+      home,
+      ".pi",
+      "agent",
+      "sessions",
+      "--C--proj--",
+      `2026-07-24T17-10-59-546Z_${ID}.jsonl`,
+    ),
+    BODY,
   );
-  const got = resolve({ agent: "pi", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
+  const got = resolve({
+    agent: "pi",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.path, file);
 });
 
 test("grok resolves chat_history.jsonl inside a directory named for the session", () => {
   const home = tmpHome();
-  const file = writeFile(path.join(home, ".grok", "sessions", "C%3A%5Cproj", ID, "chat_history.jsonl"), BODY);
-  writeFile(path.join(home, ".grok", "sessions", "C%3A%5Cproj", ID, "announcement_state.json"), "{}");
-  const got = resolve({ agent: "grok", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
+  const file = writeFile(
+    path.join(
+      home,
+      ".grok",
+      "sessions",
+      "C%3A%5Cproj",
+      ID,
+      "chat_history.jsonl",
+    ),
+    BODY,
+  );
+  writeFile(
+    path.join(
+      home,
+      ".grok",
+      "sessions",
+      "C%3A%5Cproj",
+      ID,
+      "announcement_state.json",
+    ),
+    "{}",
+  );
+  const got = resolve({
+    agent: "grok",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.path, file);
 });
 
 test("opencode returns a sqlite descriptor rather than a file", () => {
   const home = tmpHome();
-  const db = writeFile(path.join(home, ".local", "share", "opencode", "opencode.db"), "x");
+  const db = writeFile(
+    path.join(home, ".local", "share", "opencode", "opencode.db"),
+    "x",
+  );
   const got = resolve({
-    agent: "opencode", sessionRef: { kind: "id", value: "ses_06af8a" }, homedir: home, env: {},
+    agent: "opencode",
+    sessionRef: { kind: "id", value: "ses_06af8a" },
+    homedir: home,
+    env: {},
   });
   assert.equal(got.strategy, "sqlite");
   assert.equal(got.dbPath, db);
@@ -725,12 +913,18 @@ test("non-integrated kinds are refused outright", () => {
   const home = tmpHome();
   for (const agent of ["gemini", "agy", "cline", "kiro", "amp", "maki"]) {
     assert.throws(
-      () => resolve({ agent, sessionRef: { kind: "id", value: ID }, homedir: home, env: {} }),
+      () =>
+        resolve({
+          agent,
+          sessionRef: { kind: "id", value: ID },
+          homedir: home,
+          env: {},
+        }),
       (err) => {
         assert.ok(err instanceof SourceContextUnavailable);
         assert.match(err.reason, /no session identity/);
         return true;
-      }
+      },
     );
   }
 });
@@ -738,8 +932,9 @@ test("non-integrated kinds are refused outright", () => {
 test("a missing session reference is refused", () => {
   const home = tmpHome();
   assert.throws(
-    () => resolve({ agent: "claude", sessionRef: null, homedir: home, env: {} }),
-    SourceContextUnavailable
+    () =>
+      resolve({ agent: "claude", sessionRef: null, homedir: home, env: {} }),
+    SourceContextUnavailable,
   );
 });
 
@@ -747,8 +942,14 @@ test("zero matches is a hard failure", () => {
   const home = tmpHome();
   fs.mkdirSync(path.join(home, ".claude", "projects"), { recursive: true });
   assert.throws(
-    () => resolve({ agent: "claude", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} }),
-    SourceContextUnavailable
+    () =>
+      resolve({
+        agent: "claude",
+        sessionRef: { kind: "id", value: ID },
+        homedir: home,
+        env: {},
+      }),
+    SourceContextUnavailable,
   );
 });
 
@@ -757,11 +958,17 @@ test("more than one match is a hard failure rather than a guess", () => {
   writeFile(path.join(home, ".claude", "projects", "a", `${ID}.jsonl`), BODY);
   writeFile(path.join(home, ".claude", "projects", "b", `${ID}.jsonl`), BODY);
   assert.throws(
-    () => resolve({ agent: "claude", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} }),
+    () =>
+      resolve({
+        agent: "claude",
+        sessionRef: { kind: "id", value: ID },
+        homedir: home,
+        env: {},
+      }),
     (err) => {
       assert.match(err.reason, /more than one/);
       return true;
-    }
+    },
   );
 });
 
@@ -769,33 +976,58 @@ test("an empty transcript is a hard failure", () => {
   const home = tmpHome();
   writeFile(path.join(home, ".claude", "projects", "a", `${ID}.jsonl`), "");
   assert.throws(
-    () => resolve({ agent: "claude", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} }),
-    SourceContextUnavailable
+    () =>
+      resolve({
+        agent: "claude",
+        sessionRef: { kind: "id", value: ID },
+        homedir: home,
+        env: {},
+      }),
+    SourceContextUnavailable,
   );
 });
 
 test("a kind:path value that does not exist is a hard failure", () => {
   const home = tmpHome();
   assert.throws(
-    () => resolve({
-      agent: "pi", sessionRef: { kind: "path", value: path.join(home, "nope.jsonl") },
-      homedir: home, env: {},
-    }),
-    SourceContextUnavailable
+    () =>
+      resolve({
+        agent: "pi",
+        sessionRef: { kind: "path", value: path.join(home, "nope.jsonl") },
+        homedir: home,
+        env: {},
+      }),
+    SourceContextUnavailable,
   );
 });
 
 test("best-effort agents match any recognised extension containing the id", () => {
   const home = tmpHome();
-  const file = writeFile(path.join(home, ".factory", "sessions", `conv-${ID}.json`), BODY);
-  const got = resolve({ agent: "droid", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
+  const file = writeFile(
+    path.join(home, ".factory", "sessions", `conv-${ID}.json`),
+    BODY,
+  );
+  const got = resolve({
+    agent: "droid",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.path, file);
 });
 
 test("counts lines correctly when the file has no trailing newline", () => {
   const home = tmpHome();
-  writeFile(path.join(home, ".claude", "projects", "a", `${ID}.jsonl`), '{"a":1}\n{"b":2}');
-  const got = resolve({ agent: "claude", sessionRef: { kind: "id", value: ID }, homedir: home, env: {} });
+  writeFile(
+    path.join(home, ".claude", "projects", "a", `${ID}.jsonl`),
+    '{"a":1}\n{"b":2}',
+  );
+  const got = resolve({
+    agent: "claude",
+    sessionRef: { kind: "id", value: ID },
+    homedir: home,
+    env: {},
+  });
   assert.equal(got.lines, 2);
 });
 ```
@@ -852,7 +1084,8 @@ const STORES = {
       env.CODEX_HOME ? join(env.CODEX_HOME, "sessions") : null,
       join(home, ".codex", "sessions"),
     ],
-    fileMatch: (base, id) => base.startsWith("rollout-") && base.endsWith(`-${id}.jsonl`),
+    fileMatch: (base, id) =>
+      base.startsWith("rollout-") && base.endsWith(`-${id}.jsonl`),
   },
   pi: {
     strategy: "file",
@@ -871,12 +1104,17 @@ const STORES = {
     strategy: "sqlite",
     verified: true,
     dbPaths: (home, env) => [
-      env.XDG_DATA_HOME ? join(env.XDG_DATA_HOME, "opencode", "opencode.db") : null,
+      env.XDG_DATA_HOME
+        ? join(env.XDG_DATA_HOME, "opencode", "opencode.db")
+        : null,
       join(home, ".local", "share", "opencode", "opencode.db"),
       join(home, "Library", "Application Support", "opencode", "opencode.db"),
     ],
   },
-  omp: { strategy: "file", roots: (home) => [join(home, ".omp", "agent", "sessions")] },
+  omp: {
+    strategy: "file",
+    roots: (home) => [join(home, ".omp", "agent", "sessions")],
+  },
   copilot: { strategy: "file", roots: (home) => [join(home, ".copilot")] },
   devin: { strategy: "file", roots: (home) => [join(home, ".devin")] },
   droid: { strategy: "file", roots: (home) => [join(home, ".factory")] },
@@ -888,7 +1126,10 @@ const STORES = {
     strategy: "file",
     roots: (home) => [join(home, ".mastracode"), join(home, ".mastra")],
   },
-  hermes: { strategy: "file", roots: (home) => [join(home, ".hermes", "sessions")] },
+  hermes: {
+    strategy: "file",
+    roots: (home) => [join(home, ".hermes", "sessions")],
+  },
 };
 
 function countLines(buffer) {
@@ -906,10 +1147,13 @@ function describeFile(file) {
   } catch {
     throw new SourceContextUnavailable(`session file does not exist: ${file}`);
   }
-  if (!stat.isFile()) throw new SourceContextUnavailable(`session path is not a file: ${file}`);
-  if (stat.size === 0) throw new SourceContextUnavailable(`session file is empty: ${file}`);
+  if (!stat.isFile())
+    throw new SourceContextUnavailable(`session path is not a file: ${file}`);
+  if (stat.size === 0)
+    throw new SourceContextUnavailable(`session file is empty: ${file}`);
   const lines = countLines(fs.readFileSync(file));
-  if (lines < 1) throw new SourceContextUnavailable(`session file has no lines: ${file}`);
+  if (lines < 1)
+    throw new SourceContextUnavailable(`session file has no lines: ${file}`);
   return { strategy: "file", path: file, bytes: stat.size, lines };
 }
 
@@ -933,7 +1177,10 @@ function search(root, store, id) {
   const fileMatches = (base) => {
     if (store.fileMatch) return store.fileMatch(base, id);
     if (!bestEffort) return false;
-    return base.includes(id) && BEST_EFFORT_EXTENSIONS.has(path.extname(base).toLowerCase());
+    return (
+      base.includes(id) &&
+      BEST_EFFORT_EXTENSIONS.has(path.extname(base).toLowerCase())
+    );
   };
 
   const walk = (dir, depth) => {
@@ -956,8 +1203,13 @@ function search(root, store, id) {
             continue;
           }
           const picked = inner.filter(
-            (e) => e.isFile() && (store.dirFile ? store.dirFile(e.name)
-              : BEST_EFFORT_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
+            (e) =>
+              e.isFile() &&
+              (store.dirFile
+                ? store.dirFile(e.name)
+                : BEST_EFFORT_EXTENSIONS.has(
+                    path.extname(e.name).toLowerCase(),
+                  )),
           );
           for (const p of picked) matches.push(path.join(full, p.name));
           continue;
@@ -973,20 +1225,29 @@ function search(root, store, id) {
   return matches;
 }
 
-function resolve({ agent, sessionRef, env = process.env, homedir = os.homedir() }) {
+function resolve({
+  agent,
+  sessionRef,
+  env = process.env,
+  homedir = os.homedir(),
+}) {
   if (!SOURCE_KINDS.has(agent)) {
     throw new SourceContextUnavailable(
-      `${agent} reports no session identity to Herdr, so it cannot be a handoff source`
+      `${agent} reports no session identity to Herdr, so it cannot be a handoff source`,
     );
   }
 
   const store = STORES[agent];
   if (!store) {
-    throw new SourceContextUnavailable(`no session store is configured for ${agent}`);
+    throw new SourceContextUnavailable(
+      `no session store is configured for ${agent}`,
+    );
   }
 
   if (!sessionRef || !sessionRef.value) {
-    throw new SourceContextUnavailable(`Herdr reported no session reference for ${agent}`);
+    throw new SourceContextUnavailable(
+      `Herdr reported no session reference for ${agent}`,
+    );
   }
 
   if (sessionRef.kind === "path") {
@@ -1005,16 +1266,20 @@ function resolve({ agent, sessionRef, env = process.env, homedir = os.homedir() 
 
   const root = firstExisting(store.roots(homedir, env));
   if (!root) {
-    throw new SourceContextUnavailable(`${agent} session store directory not found`);
+    throw new SourceContextUnavailable(
+      `${agent} session store directory not found`,
+    );
   }
 
   const matches = search(root, store, id);
   if (matches.length === 0) {
-    throw new SourceContextUnavailable(`no session file for ${agent} session ${id}`);
+    throw new SourceContextUnavailable(
+      `no session file for ${agent} session ${id}`,
+    );
   }
   if (matches.length > 1) {
     throw new SourceContextUnavailable(
-      `more than one candidate session file for ${agent} session ${id}`
+      `more than one candidate session file for ${agent} session ${id}`,
     );
   }
   return describeFile(matches[0]);
@@ -1045,10 +1310,12 @@ git commit -m "feat: resolve native session transcripts with hard failure on amb
 ### Task 5: Source resolution — opencode SQLite strategy
 
 **Files:**
+
 - Create: `lib/source-sqlite.js`
 - Test: `test/source-sqlite.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks.
 - Produces: `lib/source-sqlite.js` exporting:
   - `class SqliteUnavailable extends Error`
@@ -1067,7 +1334,11 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { extract, hasSqlite, SqliteUnavailable } = require("../lib/source-sqlite.js");
+const {
+  extract,
+  hasSqlite,
+  SqliteUnavailable,
+} = require("../lib/source-sqlite.js");
 
 const SKIP = !hasSqlite();
 const SID = "ses_06af8a6fcffeIyWB7w5lX0xE7y";
@@ -1092,56 +1363,139 @@ function buildDb() {
     CREATE TABLE event_sequence (aggregate_id TEXT PRIMARY KEY, seq INTEGER, owner_id TEXT);
     CREATE TABLE event (id TEXT PRIMARY KEY, aggregate_id TEXT, seq INTEGER, type TEXT, data TEXT);
   `);
-  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)")
-    .run(SID, "proj", "/w", "Fix the parser", "build", "opus", 1, 2);
-  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)")
-    .run(OTHER, "proj", "/w", "Unrelated", "build", "opus", 1, 2);
+  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)").run(
+    SID,
+    "proj",
+    "/w",
+    "Fix the parser",
+    "build",
+    "opus",
+    1,
+    2,
+  );
+  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)").run(
+    OTHER,
+    "proj",
+    "/w",
+    "Unrelated",
+    "build",
+    "opus",
+    1,
+    2,
+  );
   // Insert out of chronological order to prove the exporter sorts.
-  db.prepare("INSERT INTO message VALUES (?,?,?,?,?)").run("m2", SID, 20, 20, '{"role":"assistant"}');
-  db.prepare("INSERT INTO message VALUES (?,?,?,?,?)").run("m1", SID, 10, 10, '{"role":"user"}');
-  db.prepare("INSERT INTO message VALUES (?,?,?,?,?)").run("mX", OTHER, 10, 10, '{"role":"user"}');
-  db.prepare("INSERT INTO part VALUES (?,?,?,?,?,?)").run("p2", "m1", SID, 12, 12, '{"type":"text","text":"beta"}');
-  db.prepare("INSERT INTO part VALUES (?,?,?,?,?,?)").run("p1", "m1", SID, 11, 11, '{"type":"text","text":"alpha"}');
-  db.prepare("INSERT INTO todo VALUES (?,?,?,?,?,?,?)").run(SID, "Ship it", "pending", "high", 0, 1, 1);
-  db.prepare("INSERT INTO event VALUES (?,?,?,?,?)").run("e1", SID, 1, "message.updated.1", "{}");
+  db.prepare("INSERT INTO message VALUES (?,?,?,?,?)").run(
+    "m2",
+    SID,
+    20,
+    20,
+    '{"role":"assistant"}',
+  );
+  db.prepare("INSERT INTO message VALUES (?,?,?,?,?)").run(
+    "m1",
+    SID,
+    10,
+    10,
+    '{"role":"user"}',
+  );
+  db.prepare("INSERT INTO message VALUES (?,?,?,?,?)").run(
+    "mX",
+    OTHER,
+    10,
+    10,
+    '{"role":"user"}',
+  );
+  db.prepare("INSERT INTO part VALUES (?,?,?,?,?,?)").run(
+    "p2",
+    "m1",
+    SID,
+    12,
+    12,
+    '{"type":"text","text":"beta"}',
+  );
+  db.prepare("INSERT INTO part VALUES (?,?,?,?,?,?)").run(
+    "p1",
+    "m1",
+    SID,
+    11,
+    11,
+    '{"type":"text","text":"alpha"}',
+  );
+  db.prepare("INSERT INTO todo VALUES (?,?,?,?,?,?,?)").run(
+    SID,
+    "Ship it",
+    "pending",
+    "high",
+    0,
+    1,
+    1,
+  );
+  db.prepare("INSERT INTO event VALUES (?,?,?,?,?)").run(
+    "e1",
+    SID,
+    1,
+    "message.updated.1",
+    "{}",
+  );
   db.close();
   return dbPath;
 }
 
 function readLines(file) {
-  return fs.readFileSync(file, "utf8").split("\n").filter((l) => l !== "").map((l) => JSON.parse(l));
+  return fs
+    .readFileSync(file, "utf8")
+    .split("\n")
+    .filter((l) => l !== "")
+    .map((l) => JSON.parse(l));
 }
 
 test("hasSqlite reflects node:sqlite availability", () => {
   assert.equal(typeof hasSqlite(), "boolean");
 });
 
-test("extract emits every row for the session in deterministic order", { skip: SKIP }, () => {
-  const dbPath = buildDb();
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
-  const out = extract({ dbPath, sessionId: SID, workDir });
-  const rows = readLines(out.jsonlPath);
+test(
+  "extract emits every row for the session in deterministic order",
+  { skip: SKIP },
+  () => {
+    const dbPath = buildDb();
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
+    const out = extract({ dbPath, sessionId: SID, workDir });
+    const rows = readLines(out.jsonlPath);
 
-  assert.deepEqual(
-    rows.map((r) => r.table),
-    ["session", "message", "message", "part", "part", "todo", "event"]
-  );
-  assert.deepEqual(rows.filter((r) => r.table === "message").map((r) => r.row.id), ["m1", "m2"]);
-  assert.deepEqual(rows.filter((r) => r.table === "part").map((r) => r.row.id), ["p1", "p2"]);
-  assert.equal(out.lines, rows.length);
-  assert.equal(out.counts.message, 2);
-  assert.equal(out.counts.part, 2);
-  assert.equal(out.counts.event, 1);
-});
+    assert.deepEqual(
+      rows.map((r) => r.table),
+      ["session", "message", "message", "part", "part", "todo", "event"],
+    );
+    assert.deepEqual(
+      rows.filter((r) => r.table === "message").map((r) => r.row.id),
+      ["m1", "m2"],
+    );
+    assert.deepEqual(
+      rows.filter((r) => r.table === "part").map((r) => r.row.id),
+      ["p1", "p2"],
+    );
+    assert.equal(out.lines, rows.length);
+    assert.equal(out.counts.message, 2);
+    assert.equal(out.counts.part, 2);
+    assert.equal(out.counts.event, 1);
+  },
+);
 
-test("extract excludes rows belonging to other sessions", { skip: SKIP }, () => {
-  const dbPath = buildDb();
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
-  const out = extract({ dbPath, sessionId: SID, workDir });
-  const body = fs.readFileSync(out.jsonlPath, "utf8");
-  assert.ok(!body.includes(OTHER), "other session ids must not leak into the export");
-  assert.ok(!body.includes("Unrelated"));
-});
+test(
+  "extract excludes rows belonging to other sessions",
+  { skip: SKIP },
+  () => {
+    const dbPath = buildDb();
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
+    const out = extract({ dbPath, sessionId: SID, workDir });
+    const body = fs.readFileSync(out.jsonlPath, "utf8");
+    assert.ok(
+      !body.includes(OTHER),
+      "other session ids must not leak into the export",
+    );
+    assert.ok(!body.includes("Unrelated"));
+  },
+);
 
 test("extract preserves data payloads byte-identically", { skip: SKIP }, () => {
   const dbPath = buildDb();
@@ -1157,14 +1511,24 @@ test("extract never opens the original database file", { skip: SKIP }, () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
   const before = fs.statSync(dbPath).mtimeMs;
   extract({ dbPath, sessionId: SID, workDir });
-  assert.equal(fs.statSync(dbPath).mtimeMs, before, "source database must not be modified");
-  assert.ok(fs.existsSync(path.join(workDir, "opencode-copy.db")), "should work from a copy");
+  assert.equal(
+    fs.statSync(dbPath).mtimeMs,
+    before,
+    "source database must not be modified",
+  );
+  assert.ok(
+    fs.existsSync(path.join(workDir, "opencode-copy.db")),
+    "should work from a copy",
+  );
 });
 
 test("extract rejects a session with no rows", { skip: SKIP }, () => {
   const dbPath = buildDb();
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
-  assert.throws(() => extract({ dbPath, sessionId: "ses_missing", workDir }), /no opencode session/);
+  assert.throws(
+    () => extract({ dbPath, sessionId: "ses_missing", workDir }),
+    /no opencode session/,
+  );
 });
 
 test("extract rejects a session row with no messages", { skip: SKIP }, () => {
@@ -1174,32 +1538,43 @@ test("extract rejects a session row with no messages", { skip: SKIP }, () => {
   db.prepare("DELETE FROM message WHERE session_id = ?").run(SID);
   db.close();
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
-  assert.throws(() => extract({ dbPath, sessionId: SID, workDir }), /no messages/);
+  assert.throws(
+    () => extract({ dbPath, sessionId: SID, workDir }),
+    /no messages/,
+  );
 });
 
-test("extract succeeds when the event log has been pruned", { skip: SKIP }, () => {
-  const { DatabaseSync } = require("node:sqlite");
-  const dbPath = buildDb();
-  const db = new DatabaseSync(dbPath);
-  db.prepare("DELETE FROM event WHERE aggregate_id = ?").run(SID);
-  db.close();
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
-  const out = extract({ dbPath, sessionId: SID, workDir });
-  assert.equal(out.counts.event, 0);
-  assert.ok(out.lines > 0);
-});
+test(
+  "extract succeeds when the event log has been pruned",
+  { skip: SKIP },
+  () => {
+    const { DatabaseSync } = require("node:sqlite");
+    const dbPath = buildDb();
+    const db = new DatabaseSync(dbPath);
+    db.prepare("DELETE FROM event WHERE aggregate_id = ?").run(SID);
+    db.close();
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
+    const out = extract({ dbPath, sessionId: SID, workDir });
+    assert.equal(out.counts.event, 0);
+    assert.ok(out.lines > 0);
+  },
+);
 
-test("extract tolerates a database missing the newer tables", { skip: SKIP }, () => {
-  const { DatabaseSync } = require("node:sqlite");
-  const dbPath = buildDb();
-  const db = new DatabaseSync(dbPath);
-  db.exec("DROP TABLE session_message; DROP TABLE todo;");
-  db.close();
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
-  const out = extract({ dbPath, sessionId: SID, workDir });
-  assert.equal(out.counts.session_message, 0);
-  assert.equal(out.counts.todo, 0);
-});
+test(
+  "extract tolerates a database missing the newer tables",
+  { skip: SKIP },
+  () => {
+    const { DatabaseSync } = require("node:sqlite");
+    const dbPath = buildDb();
+    const db = new DatabaseSync(dbPath);
+    db.exec("DROP TABLE session_message; DROP TABLE todo;");
+    db.close();
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-work-"));
+    const out = extract({ dbPath, sessionId: SID, workDir });
+    assert.equal(out.counts.session_message, 0);
+    assert.equal(out.counts.todo, 0);
+  },
+);
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1271,7 +1646,9 @@ function copyDatabase(dbPath, workDir) {
 function extract({ dbPath, sessionId, workDir }) {
   const sqlite = loadSqlite();
   if (!sqlite) {
-    throw new SqliteUnavailable("node:sqlite is unavailable; Node 22.5 or newer is required");
+    throw new SqliteUnavailable(
+      "node:sqlite is unavailable; Node 22.5 or newer is required",
+    );
   }
 
   const copy = copyDatabase(dbPath, workDir);
@@ -1287,7 +1664,9 @@ function extract({ dbPath, sessionId, workDir }) {
         continue;
       }
       const rows = db
-        .prepare(`SELECT * FROM "${table.name}" WHERE "${table.where}" = ? ORDER BY ${table.order}`)
+        .prepare(
+          `SELECT * FROM "${table.name}" WHERE "${table.where}" = ? ORDER BY ${table.order}`,
+        )
         .all(sessionId);
       counts[table.name] = rows.length;
       for (const row of rows) {
@@ -1296,10 +1675,14 @@ function extract({ dbPath, sessionId, workDir }) {
     }
 
     if (counts.session === 0) {
-      throw new SqliteUnavailable(`no opencode session found for id ${sessionId}`);
+      throw new SqliteUnavailable(
+        `no opencode session found for id ${sessionId}`,
+      );
     }
     if (counts.message === 0) {
-      throw new SqliteUnavailable(`opencode session ${sessionId} has no messages`);
+      throw new SqliteUnavailable(
+        `opencode session ${sessionId} has no messages`,
+      );
     }
 
     const body = Buffer.from(chunks.join(""), "utf8");
@@ -1311,12 +1694,14 @@ function extract({ dbPath, sessionId, workDir }) {
     for (const table of TABLES) {
       if (!tableExists(db, table.name)) continue;
       recount += db
-        .prepare(`SELECT COUNT(*) AS c FROM "${table.name}" WHERE "${table.where}" = ?`)
+        .prepare(
+          `SELECT COUNT(*) AS c FROM "${table.name}" WHERE "${table.where}" = ?`,
+        )
         .get(sessionId).c;
     }
     if (recount !== emitted) {
       throw new SqliteUnavailable(
-        `opencode export is incomplete: emitted ${emitted} rows but the database holds ${recount}`
+        `opencode export is incomplete: emitted ${emitted} rows but the database holds ${recount}`,
       );
     }
 
@@ -1346,10 +1731,12 @@ git commit -m "feat: extract complete opencode sessions from its SQLite store"
 ### Task 6: Snapshot writer
 
 **Files:**
+
 - Create: `lib/snapshot.js`
 - Test: `test/snapshot.test.js`
 
 **Interfaces:**
+
 - Consumes: `lib/source-sqlite.js` (`extract`, `hasSqlite`, `SqliteUnavailable`), `lib/sources.js` (`countLines`).
 - Produces: `lib/snapshot.js` exporting:
   - `chunk(buffer: Buffer, opts?: {maxLines?: number, maxBytes?: number}): Array<{buffer: Buffer, lines: number}>`
@@ -1376,16 +1763,26 @@ function tmp() {
 }
 
 const META = {
-  sourceKind: "pi", sourceName: "pi", sessionId: "abc", sourcePaneId: "w5:p1",
-  workspaceId: "w5", tabId: "w5:t1", cwd: "/w", destination: "tab",
-  targetKind: "claude", targetName: "Claude Code",
+  sourceKind: "pi",
+  sourceName: "pi",
+  sessionId: "abc",
+  sourcePaneId: "w5:p1",
+  workspaceId: "w5",
+  tabId: "w5:t1",
+  cwd: "/w",
+  destination: "tab",
+  targetKind: "claude",
+  targetName: "Claude Code",
 };
 
 test("chunk splits on line boundaries and reassembles byte-for-byte", () => {
   const body = Buffer.from("a\nb\nc\nd\ne\n");
   const parts = chunk(body, { maxLines: 2, maxBytes: 1024 });
   assert.equal(parts.length, 3);
-  assert.deepEqual(parts.map((p) => p.lines), [2, 2, 1]);
+  assert.deepEqual(
+    parts.map((p) => p.lines),
+    [2, 2, 1],
+  );
   assert.deepEqual(Buffer.concat(parts.map((p) => p.buffer)), body);
 });
 
@@ -1399,7 +1796,10 @@ test("chunk respects the byte cap even when the line cap is not reached", () => 
 test("chunk handles a final line with no trailing newline", () => {
   const body = Buffer.from("a\nb");
   const parts = chunk(body, { maxLines: 1, maxBytes: 1024 });
-  assert.deepEqual(parts.map((p) => p.lines), [1, 1]);
+  assert.deepEqual(
+    parts.map((p) => p.lines),
+    [1, 1],
+  );
   assert.deepEqual(Buffer.concat(parts.map((p) => p.buffer)), body);
 });
 
@@ -1424,31 +1824,53 @@ test("chunk returns nothing for an empty buffer", () => {
 test("write produces parts that reassemble into the original file", () => {
   const home = tmp();
   const src = path.join(home, "session.jsonl");
-  const body = Array.from({ length: 3000 }, (_, i) => JSON.stringify({ i })).join("\n") + "\n";
+  const body =
+    Array.from({ length: 3000 }, (_, i) => JSON.stringify({ i })).join("\n") +
+    "\n";
   fs.writeFileSync(src, body);
 
   const base = tmp();
   const out = write({
-    resolved: { strategy: "file", path: src, bytes: Buffer.byteLength(body), lines: 3000 },
-    meta: META, baseDir: base, now: new Date("2026-07-25T12:00:00Z"),
+    resolved: {
+      strategy: "file",
+      path: src,
+      bytes: Buffer.byteLength(body),
+      lines: 3000,
+    },
+    meta: META,
+    baseDir: base,
+    now: new Date("2026-07-25T12:00:00Z"),
   });
 
-  assert.ok(out.parts.length >= 3, "3000 lines should exceed one 1200-line part");
+  assert.ok(
+    out.parts.length >= 3,
+    "3000 lines should exceed one 1200-line part",
+  );
   const joined = Buffer.concat(out.parts.map((p) => fs.readFileSync(p.file)));
   assert.deepEqual(joined, Buffer.from(body));
   assert.equal(out.totalLines, 3000);
-  assert.equal(out.sha256, crypto.createHash("sha256").update(body).digest("hex"));
+  assert.equal(
+    out.sha256,
+    crypto.createHash("sha256").update(body).digest("hex"),
+  );
 });
 
 test("write records contiguous part line ranges summing to the total", () => {
   const home = tmp();
   const src = path.join(home, "s.jsonl");
-  const body = Array.from({ length: 2500 }, (_, i) => `line ${i}`).join("\n") + "\n";
+  const body =
+    Array.from({ length: 2500 }, (_, i) => `line ${i}`).join("\n") + "\n";
   fs.writeFileSync(src, body);
   const base = tmp();
   const out = write({
-    resolved: { strategy: "file", path: src, bytes: Buffer.byteLength(body), lines: 2500 },
-    meta: META, baseDir: base,
+    resolved: {
+      strategy: "file",
+      path: src,
+      bytes: Buffer.byteLength(body),
+      lines: 2500,
+    },
+    meta: META,
+    baseDir: base,
   });
 
   let expected = 1;
@@ -1469,9 +1891,12 @@ test("write emits SOURCE.json with the metadata and part index", () => {
   const base = tmp();
   const out = write({
     resolved: { strategy: "file", path: src, bytes: 4, lines: 2 },
-    meta: META, baseDir: base,
+    meta: META,
+    baseDir: base,
   });
-  const source = JSON.parse(fs.readFileSync(path.join(out.dir, "SOURCE.json"), "utf8"));
+  const source = JSON.parse(
+    fs.readFileSync(path.join(out.dir, "SOURCE.json"), "utf8"),
+  );
   assert.equal(source.source_agent, "pi");
   assert.equal(source.strategy, "file");
   assert.equal(source.native_path, src);
@@ -1486,7 +1911,9 @@ test("write marks the snapshot read-only", () => {
   fs.writeFileSync(src, "a\n");
   const base = tmp();
   const out = write({
-    resolved: { strategy: "file", path: src, bytes: 2, lines: 1 }, meta: META, baseDir: base,
+    resolved: { strategy: "file", path: src, bytes: 2, lines: 1 },
+    meta: META,
+    baseDir: base,
   });
   if (process.platform !== "win32") {
     const mode = fs.statSync(out.parts[0].file).mode & 0o777;
@@ -1582,7 +2009,7 @@ function stamp(now) {
 function write({ resolved, meta, baseDir, now = new Date() }) {
   const dir = path.join(
     baseDir,
-    `${stamp(now)}-${meta.sourceKind}-to-${meta.targetKind}`
+    `${stamp(now)}-${meta.sourceKind}-to-${meta.targetKind}`,
   );
   const sessionDir = path.join(dir, "session");
   fs.mkdirSync(sessionDir, { recursive: true });
@@ -1593,7 +2020,9 @@ function write({ resolved, meta, baseDir, now = new Date() }) {
 
   if (resolved.strategy === "sqlite") {
     if (!hasSqlite()) {
-      throw new SqliteUnavailable("node:sqlite is unavailable; Node 22.5 or newer is required");
+      throw new SqliteUnavailable(
+        "node:sqlite is unavailable; Node 22.5 or newer is required",
+      );
     }
     const exported = extract({
       dbPath: resolved.dbPath,
@@ -1653,8 +2082,11 @@ function write({ resolved, meta, baseDir, now = new Date() }) {
     target_agent_name: meta.targetName,
     snapshot_utc: now.toISOString(),
     parts: parts.map((p) => ({
-      name: p.name, lines: p.lines, bytes: p.bytes,
-      first_line: p.firstLine, last_line: p.lastLine,
+      name: p.name,
+      lines: p.lines,
+      bytes: p.bytes,
+      first_line: p.firstLine,
+      last_line: p.lastLine,
     })),
   };
 
@@ -1668,7 +2100,9 @@ function write({ resolved, meta, baseDir, now = new Date() }) {
 function prune(baseDir, keep = KEEP) {
   let entries;
   try {
-    entries = fs.readdirSync(baseDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+    entries = fs
+      .readdirSync(baseDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory());
   } catch {
     return [];
   }
@@ -1708,10 +2142,12 @@ git commit -m "feat: snapshot sessions into verbatim read-only chunks with a par
 ### Task 7: Briefing generator
 
 **Files:**
+
 - Create: `lib/briefing.js`
 - Test: `test/briefing.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `lib/briefing.js` exporting:
   - `render({snapshot, meta}): string` — the full `HANDOFF.md` text.
@@ -1733,17 +2169,45 @@ const SNAPSHOT = {
   sha256: "deadbeef",
   counts: null,
   parts: [
-    { name: "session/part-001.jsonl", lines: 1200, firstLine: 1, lastLine: 1200 },
-    { name: "session/part-002.jsonl", lines: 1200, firstLine: 1201, lastLine: 2400 },
-    { name: "session/part-003.jsonl", lines: 1200, firstLine: 2401, lastLine: 3600 },
-    { name: "session/part-004.jsonl", lines: 1212, firstLine: 3601, lastLine: 4812 },
+    {
+      name: "session/part-001.jsonl",
+      lines: 1200,
+      firstLine: 1,
+      lastLine: 1200,
+    },
+    {
+      name: "session/part-002.jsonl",
+      lines: 1200,
+      firstLine: 1201,
+      lastLine: 2400,
+    },
+    {
+      name: "session/part-003.jsonl",
+      lines: 1200,
+      firstLine: 2401,
+      lastLine: 3600,
+    },
+    {
+      name: "session/part-004.jsonl",
+      lines: 1212,
+      firstLine: 3601,
+      lastLine: 4812,
+    },
   ],
 };
 
 const META = {
-  sourceKind: "pi", sourceName: "pi", sessionId: "abc", sourcePaneId: "w5:p1",
-  workspaceId: "w5", tabId: "w5:t1", cwd: "/w/proj", destination: "tab",
-  targetKind: "claude", targetName: "Claude Code", strategy: "file",
+  sourceKind: "pi",
+  sourceName: "pi",
+  sessionId: "abc",
+  sourcePaneId: "w5:p1",
+  workspaceId: "w5",
+  tabId: "w5:t1",
+  cwd: "/w/proj",
+  destination: "tab",
+  targetKind: "claude",
+  targetName: "Claude Code",
+  strategy: "file",
 };
 
 test("briefing states all six directives", () => {
@@ -1760,7 +2224,10 @@ test("briefing lists every part with its line range and the totals", () => {
   const text = render({ snapshot: SNAPSHOT, meta: META });
   for (const part of SNAPSHOT.parts) {
     assert.ok(text.includes(part.name), `missing ${part.name}`);
-    assert.ok(text.includes(`${part.firstLine}`), `missing first line ${part.firstLine}`);
+    assert.ok(
+      text.includes(`${part.firstLine}`),
+      `missing first line ${part.firstLine}`,
+    );
   }
   assert.ok(text.includes("4,812") || text.includes("4812"));
   assert.ok(text.includes("4 part"));
@@ -1786,8 +2253,16 @@ test("briefing names the source and target agents", () => {
 
 test("briefing describes the sqlite export when that strategy was used", () => {
   const text = render({
-    snapshot: { ...SNAPSHOT, counts: { session: 1, message: 12, part: 40, todo: 1, event: 135 } },
-    meta: { ...META, sourceKind: "opencode", sourceName: "opencode", strategy: "sqlite" },
+    snapshot: {
+      ...SNAPSHOT,
+      counts: { session: 1, message: 12, part: 40, todo: 1, event: 135 },
+    },
+    meta: {
+      ...META,
+      sourceKind: "opencode",
+      sourceName: "opencode",
+      strategy: "sqlite",
+    },
   });
   assert.match(text, /table/i);
   assert.match(text, /message/);
@@ -1795,7 +2270,10 @@ test("briefing describes the sqlite export when that strategy was used", () => {
 });
 
 test("kickoff is a single line naming the briefing path", () => {
-  const line = kickoff({ sourceName: "pi", handoffPath: "/state/h/HANDOFF.md" });
+  const line = kickoff({
+    sourceName: "pi",
+    handoffPath: "/state/h/HANDOFF.md",
+  });
   assert.ok(!line.includes("\n"), "kickoff must not contain newlines");
   assert.ok(!line.includes("\r"), "kickoff must not contain carriage returns");
   assert.match(line, /pi/);
@@ -1827,7 +2305,10 @@ function kickoff({ sourceName, handoffPath }) {
 
 function partsTable(snapshot) {
   const rows = snapshot.parts
-    .map((p) => `| \`${p.name}\` | ${n(p.lines)} | ${n(p.firstLine)}–${n(p.lastLine)} |`)
+    .map(
+      (p) =>
+        `| \`${p.name}\` | ${n(p.lines)} | ${n(p.firstLine)}–${n(p.lastLine)} |`,
+    )
     .join("\n");
   return ["| file | lines | line range |", "|---|---|---|", rows].join("\n");
 }
@@ -1939,10 +2420,12 @@ git commit -m "feat: generate the handoff briefing and single-line kickoff promp
 ### Task 8: Picker IPC
 
 **Files:**
+
 - Create: `lib/ipc.js`
 - Test: `test/ipc.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `lib/ipc.js` exporting:
   - `newId(): string`
@@ -2000,7 +2483,10 @@ test("waitForResult returns the payload once it appears", async () => {
 
 test("waitForResult returns null on timeout", async () => {
   const dir = tmp();
-  const got = await ipc.waitForResult(path.join(dir, "never.json"), { timeoutMs: 60, pollMs: 10 });
+  const got = await ipc.waitForResult(path.join(dir, "never.json"), {
+    timeoutMs: 60,
+    pollMs: 10,
+  });
   assert.equal(got, null);
 });
 
@@ -2087,7 +2573,15 @@ function cleanup(files) {
   }
 }
 
-module.exports = { newId, requestPath, resultPath, writeJson, readJson, waitForResult, cleanup };
+module.exports = {
+  newId,
+  requestPath,
+  resultPath,
+  writeJson,
+  readJson,
+  waitForResult,
+  cleanup,
+};
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -2107,10 +2601,12 @@ git commit -m "feat: add atomic request/result IPC between the action and the pi
 ### Task 9: Picker UI primitives
 
 **Files:**
+
 - Create: `lib/ui.js`
 - Test: `test/ui.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `lib/ui.js` exporting:
   - `decodeInput(buffer: Buffer): Array<{type: "key", name: string} | {type: "mouse", row: number, col: number}>` — mouse events are reported 0-indexed relative to the pane.
@@ -2262,14 +2758,24 @@ test("frame marks the source agent as a fresh session", () => {
 });
 
 test("frame marks the cursor row and only that row", () => {
-  const marked = ui.renderFrame(state()).filter((l) => l.trimStart().startsWith("▸"));
+  const marked = ui
+    .renderFrame(state())
+    .filter((l) => l.trimStart().startsWith("▸"));
   assert.equal(marked.length, 1);
   assert.match(marked[0], /Claude Code/);
 });
 
 test("frame scrolls when the roster exceeds the viewport", () => {
-  const many = Array.from({ length: 21 }, (_, i) => ({ kind: `k${i}`, name: `Agent ${i}` }));
-  let s = state({ available: many, height: 14, unavailableCount: 0, unavailable: [] });
+  const many = Array.from({ length: 21 }, (_, i) => ({
+    kind: `k${i}`,
+    name: `Agent ${i}`,
+  }));
+  let s = state({
+    available: many,
+    height: 14,
+    unavailableCount: 0,
+    unavailable: [],
+  });
   for (let i = 0; i < 20; i += 1) ({ state: s } = ui.applyKey(s, "down"));
   const text = ui.renderFrame(s).join("\n");
   assert.match(text, /Agent 20/, "cursor row must stay visible");
@@ -2313,19 +2819,50 @@ function decodeInput(buffer) {
       continue;
     }
 
-    if (rest.startsWith("\x1b[A")) { events.push({ type: "key", name: "up" }); i += 3; continue; }
-    if (rest.startsWith("\x1b[B")) { events.push({ type: "key", name: "down" }); i += 3; continue; }
-    if (rest.startsWith("\x1b[C")) { events.push({ type: "key", name: "right" }); i += 3; continue; }
-    if (rest.startsWith("\x1b[D")) { events.push({ type: "key", name: "left" }); i += 3; continue; }
+    if (rest.startsWith("\x1b[A")) {
+      events.push({ type: "key", name: "up" });
+      i += 3;
+      continue;
+    }
+    if (rest.startsWith("\x1b[B")) {
+      events.push({ type: "key", name: "down" });
+      i += 3;
+      continue;
+    }
+    if (rest.startsWith("\x1b[C")) {
+      events.push({ type: "key", name: "right" });
+      i += 3;
+      continue;
+    }
+    if (rest.startsWith("\x1b[D")) {
+      events.push({ type: "key", name: "left" });
+      i += 3;
+      continue;
+    }
 
     const ch = text[i];
     i += 1;
 
-    if (ch === "\x1b") { events.push({ type: "key", name: "escape" }); continue; }
-    if (ch === "\r" || ch === "\n") { events.push({ type: "key", name: "enter" }); continue; }
-    if (ch === "\x03") { events.push({ type: "key", name: "ctrl-c" }); continue; }
-    if (ch === "\x7f") { events.push({ type: "key", name: "backspace" }); continue; }
-    if (ch >= " " && ch <= "~") { events.push({ type: "key", name: ch }); continue; }
+    if (ch === "\x1b") {
+      events.push({ type: "key", name: "escape" });
+      continue;
+    }
+    if (ch === "\r" || ch === "\n") {
+      events.push({ type: "key", name: "enter" });
+      continue;
+    }
+    if (ch === "\x03") {
+      events.push({ type: "key", name: "ctrl-c" });
+      continue;
+    }
+    if (ch === "\x7f") {
+      events.push({ type: "key", name: "backspace" });
+      continue;
+    }
+    if (ch >= " " && ch <= "~") {
+      events.push({ type: "key", name: ch });
+      continue;
+    }
   }
 
   return events;
@@ -2333,12 +2870,25 @@ function decodeInput(buffer) {
 
 function initialState(opts) {
   const {
-    title, contextLine, available, unavailable = [], unavailableCount = 0,
-    width = 78, height = 20,
+    title,
+    contextLine,
+    available,
+    unavailable = [],
+    unavailableCount = 0,
+    width = 78,
+    height = 20,
   } = opts;
   return {
-    title, contextLine, available, unavailable, unavailableCount,
-    width, height, cursor: 0, scrollTop: 0, showUnavailable: false,
+    title,
+    contextLine,
+    available,
+    unavailable,
+    unavailableCount,
+    width,
+    height,
+    cursor: 0,
+    scrollTop: 0,
+    showUnavailable: false,
   };
 }
 
@@ -2348,7 +2898,9 @@ const HEADER_ROWS = 4;
 const FOOTER_ROWS = 4;
 
 function viewportSize(state) {
-  const extra = state.showUnavailable ? Math.min(state.unavailable.length, 6) + 1 : 0;
+  const extra = state.showUnavailable
+    ? Math.min(state.unavailable.length, 6) + 1
+    : 0;
   return Math.max(1, state.height - HEADER_ROWS - FOOTER_ROWS - extra);
 }
 
@@ -2357,7 +2909,10 @@ function clampScroll(state) {
   let scrollTop = state.scrollTop;
   if (state.cursor < scrollTop) scrollTop = state.cursor;
   if (state.cursor >= scrollTop + size) scrollTop = state.cursor - size + 1;
-  scrollTop = Math.max(0, Math.min(scrollTop, Math.max(0, state.available.length - size)));
+  scrollTop = Math.max(
+    0,
+    Math.min(scrollTop, Math.max(0, state.available.length - size)),
+  );
   return { ...state, scrollTop };
 }
 
@@ -2369,11 +2924,20 @@ function applyKey(state, key) {
   }
 
   if (key === "up" || key === "k") {
-    return { state: clampScroll({ ...state, cursor: Math.max(0, state.cursor - 1) }), action: null };
+    return {
+      state: clampScroll({ ...state, cursor: Math.max(0, state.cursor - 1) }),
+      action: null,
+    };
   }
 
   if (key === "down" || key === "j") {
-    return { state: clampScroll({ ...state, cursor: Math.min(last, state.cursor + 1) }), action: null };
+    return {
+      state: clampScroll({
+        ...state,
+        cursor: Math.min(last, state.cursor + 1),
+      }),
+      action: null,
+    };
   }
 
   if (key === "enter") {
@@ -2382,7 +2946,10 @@ function applyKey(state, key) {
   }
 
   if (key === "?") {
-    return { state: clampScroll({ ...state, showUnavailable: !state.showUnavailable }), action: null };
+    return {
+      state: clampScroll({ ...state, showUnavailable: !state.showUnavailable }),
+      action: null,
+    };
   }
 
   if (key >= "1" && key <= "9") {
@@ -2398,7 +2965,10 @@ function agentRowIndex(state) {
   // Maps a rendered row number to an index into state.available.
   const map = new Map();
   const size = viewportSize(state);
-  const visible = state.available.slice(state.scrollTop, state.scrollTop + size);
+  const visible = state.available.slice(
+    state.scrollTop,
+    state.scrollTop + size,
+  );
   visible.forEach((_, offset) => {
     map.set(HEADER_ROWS + offset, state.scrollTop + offset);
   });
@@ -2410,11 +2980,16 @@ function applyClick(state, row) {
   if (index === undefined) return { state, action: null };
   const chosen = state.available[index];
   if (!chosen) return { state, action: null };
-  return { state: { ...state, cursor: index }, action: { select: chosen.kind } };
+  return {
+    state: { ...state, cursor: index },
+    action: { select: chosen.kind },
+  };
 }
 
 function pad(text, width) {
-  return text.length >= width ? text.slice(0, width) : text + " ".repeat(width - text.length);
+  return text.length >= width
+    ? text.slice(0, width)
+    : text + " ".repeat(width - text.length);
 }
 
 function renderFrame(state) {
@@ -2428,12 +3003,17 @@ function renderFrame(state) {
   lines.push("");
 
   const size = viewportSize(state);
-  const visible = state.available.slice(state.scrollTop, state.scrollTop + size);
+  const visible = state.available.slice(
+    state.scrollTop,
+    state.scrollTop + size,
+  );
   for (const [offset, agent] of visible.entries()) {
     const index = state.scrollTop + offset;
     const marker = index === state.cursor ? "▸" : " ";
     const note = agent.isSource ? "same agent, fresh session" : "";
-    lines.push(`  ${marker} ${pad(agent.name, 30)}${pad(agent.kind, 14)}${note}`.trimEnd());
+    lines.push(
+      `  ${marker} ${pad(agent.name, 30)}${pad(agent.kind, 14)}${note}`.trimEnd(),
+    );
   }
 
   lines.push("");
@@ -2444,7 +3024,9 @@ function renderFrame(state) {
       lines.push(`      ${pad(agent.name, 30)}${agent.kind}`.trimEnd());
     }
   } else if (state.unavailableCount > 0) {
-    lines.push(`  ${state.unavailableCount} more supported agents not installed · ? to show`);
+    lines.push(
+      `  ${state.unavailableCount} more supported agents not installed · ? to show`,
+    );
   } else {
     lines.push("");
   }
@@ -2455,7 +3037,14 @@ function renderFrame(state) {
   return lines.slice(0, state.height);
 }
 
-module.exports = { decodeInput, initialState, applyKey, applyClick, renderFrame, viewportSize };
+module.exports = {
+  decodeInput,
+  initialState,
+  applyKey,
+  applyClick,
+  renderFrame,
+  viewportSize,
+};
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -2475,20 +3064,25 @@ git commit -m "feat: add picker UI reducer, input decoding and frame rendering"
 ### Task 10: Picker entrypoint
 
 **Files:**
+
 - Create: `bin/picker.js`
 - Test: `test/picker.test.js`
 
 **Interfaces:**
+
 - Consumes: `lib/ui.js`, `lib/ipc.js`.
 - Produces: `bin/picker.js` — reads the request file named by `HERDR_HANDOFF_REQUEST`, renders the modal, writes `{selected: kind}` or `{cancelled: true}` to the request's `result` path, and exits 0.
   Honours `HANDOFF_PICKER_HEADLESS=1`, in which case it does not touch the TTY, reads newline-separated key names from stdin, and prints each rendered frame to stdout separated by a `\f` form feed. This is the seam the tests drive.
 
   Request file shape:
+
   ```json
   {
     "resultPath": "/abs/path/id.result.json",
     "contextLine": "pi · w5:p1 · 4,812 lines  →  new tab in workspace 5",
-    "available": [{ "kind": "claude", "name": "Claude Code", "isSource": false }],
+    "available": [
+      { "kind": "claude", "name": "Claude Code", "isSource": false }
+    ],
     "unavailable": [{ "kind": "gemini", "name": "Gemini CLI (deprecated)" }],
     "unavailableCount": 14
   }
@@ -2512,17 +3106,20 @@ function setup() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-pick-"));
   const resultPath = path.join(dir, "r.result.json");
   const requestPath = path.join(dir, "r.request.json");
-  fs.writeFileSync(requestPath, JSON.stringify({
-    resultPath,
-    contextLine: "pi · w5:p1 · 4,812 lines  →  split beside w5:p1",
-    available: [
-      { kind: "claude", name: "Claude Code", isSource: false },
-      { kind: "codex", name: "Codex", isSource: false },
-      { kind: "pi", name: "pi", isSource: true },
-    ],
-    unavailable: [{ kind: "gemini", name: "Gemini CLI (deprecated)" }],
-    unavailableCount: 18,
-  }));
+  fs.writeFileSync(
+    requestPath,
+    JSON.stringify({
+      resultPath,
+      contextLine: "pi · w5:p1 · 4,812 lines  →  split beside w5:p1",
+      available: [
+        { kind: "claude", name: "Claude Code", isSource: false },
+        { kind: "codex", name: "Codex", isSource: false },
+        { kind: "pi", name: "pi", isSource: true },
+      ],
+      unavailable: [{ kind: "gemini", name: "Gemini CLI (deprecated)" }],
+      unavailableCount: 18,
+    }),
+  );
   return { dir, requestPath, resultPath };
 }
 
@@ -2542,28 +3139,36 @@ test("selecting with enter writes the chosen kind", () => {
   const { requestPath, resultPath } = setup();
   const res = runPicker(requestPath, ["down", "enter"]);
   assert.equal(res.status, 0, res.stderr);
-  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), { selected: "codex" });
+  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), {
+    selected: "codex",
+  });
 });
 
 test("selecting the source agent is allowed", () => {
   const { requestPath, resultPath } = setup();
   const res = runPicker(requestPath, ["3"]);
   assert.equal(res.status, 0, res.stderr);
-  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), { selected: "pi" });
+  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), {
+    selected: "pi",
+  });
 });
 
 test("escape writes a cancellation", () => {
   const { requestPath, resultPath } = setup();
   const res = runPicker(requestPath, ["escape"]);
   assert.equal(res.status, 0, res.stderr);
-  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), { cancelled: true });
+  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), {
+    cancelled: true,
+  });
 });
 
 test("stdin closing without a choice writes a cancellation", () => {
   const { requestPath, resultPath } = setup();
   const res = runPicker(requestPath, []);
   assert.equal(res.status, 0, res.stderr);
-  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), { cancelled: true });
+  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), {
+    cancelled: true,
+  });
 });
 
 test("the rendered frame contains the title and roster", () => {
@@ -2578,7 +3183,11 @@ test("a missing request file exits non-zero", () => {
   const res = spawnSync(process.execPath, [PICKER], {
     encoding: "utf8",
     input: "",
-    env: { ...process.env, HERDR_HANDOFF_REQUEST: path.join(os.tmpdir(), "nope.json"), HANDOFF_PICKER_HEADLESS: "1" },
+    env: {
+      ...process.env,
+      HERDR_HANDOFF_REQUEST: path.join(os.tmpdir(), "nope.json"),
+      HANDOFF_PICKER_HEADLESS: "1",
+    },
   });
   assert.notEqual(res.status, 0);
 });
@@ -2645,7 +3254,10 @@ function runHeadless(request) {
   } catch {
     input = "";
   }
-  for (const key of input.split("\n").map((k) => k.trim()).filter(Boolean)) {
+  for (const key of input
+    .split("\n")
+    .map((k) => k.trim())
+    .filter(Boolean)) {
     const out = ui.applyKey(state, key);
     state = out.state;
     drawHeadless(state);
@@ -2677,9 +3289,10 @@ function runInteractive(request) {
 
   stdin.on("data", (buf) => {
     for (const event of ui.decodeInput(buf)) {
-      const out = event.type === "mouse"
-        ? ui.applyClick(state, event.row)
-        : ui.applyKey(state, event.name);
+      const out =
+        event.type === "mouse"
+          ? ui.applyClick(state, event.row)
+          : ui.applyKey(state, event.name);
       state = out.state;
       if (out.action && out.action.select) {
         finish(request.resultPath, { selected: out.action.select }, teardown);
@@ -2693,9 +3306,15 @@ function runInteractive(request) {
     draw(state);
   });
 
-  stdin.on("end", () => finish(request.resultPath, { cancelled: true }, teardown));
-  process.on("SIGINT", () => finish(request.resultPath, { cancelled: true }, teardown));
-  process.on("SIGTERM", () => finish(request.resultPath, { cancelled: true }, teardown));
+  stdin.on("end", () =>
+    finish(request.resultPath, { cancelled: true }, teardown),
+  );
+  process.on("SIGINT", () =>
+    finish(request.resultPath, { cancelled: true }, teardown),
+  );
+  process.on("SIGTERM", () =>
+    finish(request.resultPath, { cancelled: true }, teardown),
+  );
 }
 
 function main() {
@@ -2731,12 +3350,14 @@ git commit -m "feat: add the Handoff to Agent modal picker"
 ### Task 11: Handoff orchestrator
 
 **Files:**
+
 - Create: `lib/handoff.js`
 - Create: `bin/handoff-split.js`
 - Create: `bin/handoff-tab.js`
 - Test: `test/handoff.test.js`
 
 **Interfaces:**
+
 - Consumes: `lib/herdr.js`, `lib/agents.js`, `lib/sources.js`, `lib/snapshot.js`, `lib/briefing.js`, `lib/ipc.js`, `lib/paths.js`.
 - Produces: `lib/handoff.js` exporting:
   - `MESSAGES` — the exact user-facing strings.
@@ -2746,15 +3367,15 @@ git commit -m "feat: add the Handoff to Agent modal picker"
 
 **Exact message strings** — copy verbatim, do not reword:
 
-| key | text |
-|---|---|
-| `notAgentPane` | `Handoff unavailable: the active pane is not a running agent.` |
-| `noContext` | `Full handoff unavailable: complete session context could not be retrieved for this source agent.` |
-| `needsNode225` | `Full handoff unavailable: reading opencode's session store requires Node 22.5 or newer.` |
-| `targetCreateFailed(dest)` | `Handoff failed: could not create the target ${dest}. Source pane untouched.` |
-| `startFailed(name)` | `Handoff failed: ${name} did not start. Source pane untouched.` |
-| `promptFailed(name)` | `Handoff failed: ${name} started but did not accept the handoff. Source pane untouched.` |
-| `success(src, tgt, dest)` | `Handoff started: ${src} → ${tgt} (${dest})` |
+| key                        | text                                                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `notAgentPane`             | `Handoff unavailable: the active pane is not a running agent.`                                     |
+| `noContext`                | `Full handoff unavailable: complete session context could not be retrieved for this source agent.` |
+| `needsNode225`             | `Full handoff unavailable: reading opencode's session store requires Node 22.5 or newer.`          |
+| `targetCreateFailed(dest)` | `Handoff failed: could not create the target ${dest}. Source pane untouched.`                      |
+| `startFailed(name)`        | `Handoff failed: ${name} did not start. Source pane untouched.`                                    |
+| `promptFailed(name)`       | `Handoff failed: ${name} started but did not accept the handoff. Source pane untouched.`           |
+| `success(src, tgt, dest)`  | `Handoff started: ${src} → ${tgt} (${dest})`                                                       |
 
 `dest` renders as `split` or `new tab`.
 
@@ -2773,7 +3394,11 @@ const { run, MESSAGES } = require("../lib/handoff.js");
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
 
-function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines = 3 } = {}) {
+function workspace({
+  agent = "pi",
+  sessionRef = { kind: "id", value: ID },
+  lines = 3,
+} = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-run-"));
   const state = path.join(home, "state");
   const bin = path.join(home, "bin");
@@ -2782,8 +3407,17 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     fs.writeFileSync(path.join(bin, name), "#!/bin/sh\n", { mode: 0o755 });
   }
   // pi transcript
-  const body = Array.from({ length: lines }, (_, i) => JSON.stringify({ i })).join("\n") + "\n";
-  const file = path.join(home, ".pi", "agent", "sessions", "p", `2026-07-24T00-00-00-000Z_${ID}.jsonl`);
+  const body =
+    Array.from({ length: lines }, (_, i) => JSON.stringify({ i })).join("\n") +
+    "\n";
+  const file = path.join(
+    home,
+    ".pi",
+    "agent",
+    "sessions",
+    "p",
+    `2026-07-24T00-00-00-000Z_${ID}.jsonl`,
+  );
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, body);
 
@@ -2801,8 +3435,11 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     HANDOFF_FAKE_AGENT: agent,
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
     HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
-      focused_pane_id: "w5:p1", workspace_id: "w5", tab_id: "w5:t1",
-      focused_pane_agent: agent, focused_pane_cwd: home,
+      focused_pane_id: "w5:p1",
+      workspace_id: "w5",
+      tab_id: "w5:t1",
+      focused_pane_agent: agent,
+      focused_pane_cwd: home,
     }),
     HANDOFF_TEST_HOME: home,
   };
@@ -2811,7 +3448,11 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
 
 function readCalls(file) {
   if (!fs.existsSync(file)) return [];
-  return fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  return fs
+    .readFileSync(file, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
 }
 
 test("dry run resolves and snapshots without creating panes", async () => {
@@ -2819,10 +3460,22 @@ test("dry run resolves and snapshots without creating panes", async () => {
   const out = await run({ destination: "tab", env, dryRun: true });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("pane get")), "should read the source pane");
-  assert.ok(!argv.some((a) => a.startsWith("pane split")), "must not split in dry run");
-  assert.ok(!argv.some((a) => a.startsWith("tab create")), "must not create a tab in dry run");
-  assert.ok(!argv.some((a) => a.startsWith("agent start")), "must not start an agent in dry run");
+  assert.ok(
+    argv.some((a) => a.startsWith("pane get")),
+    "should read the source pane",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("pane split")),
+    "must not split in dry run",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("tab create")),
+    "must not create a tab in dry run",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("agent start")),
+    "must not start an agent in dry run",
+  );
 });
 
 test("dry run writes a complete snapshot and briefing", async () => {
@@ -2831,10 +3484,14 @@ test("dry run writes a complete snapshot and briefing", async () => {
   const dir = out.handoffDir;
   assert.ok(fs.existsSync(path.join(dir, "HANDOFF.md")));
   assert.ok(fs.existsSync(path.join(dir, "SOURCE.json")));
-  const source = JSON.parse(fs.readFileSync(path.join(dir, "SOURCE.json"), "utf8"));
+  const source = JSON.parse(
+    fs.readFileSync(path.join(dir, "SOURCE.json"), "utf8"),
+  );
   assert.equal(source.total_lines, 5);
   const parts = fs.readdirSync(path.join(dir, "session"));
-  const joined = Buffer.concat(parts.sort().map((p) => fs.readFileSync(path.join(dir, "session", p))));
+  const joined = Buffer.concat(
+    parts.sort().map((p) => fs.readFileSync(path.join(dir, "session", p))),
+  );
   assert.equal(joined.toString(), fs.readFileSync(source.native_path, "utf8"));
 });
 
@@ -2844,7 +3501,10 @@ test("a pane with no agent fails before opening the picker", async () => {
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.notAgentPane);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(!argv.some((a) => a.startsWith("plugin pane open")), "picker must not open");
+  assert.ok(
+    !argv.some((a) => a.startsWith("plugin pane open")),
+    "picker must not open",
+  );
 });
 
 test("an unresolvable source fails before opening the picker", async () => {
@@ -2853,7 +3513,10 @@ test("an unresolvable source fails before opening the picker", async () => {
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.noContext);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(!argv.some((a) => a.startsWith("plugin pane open")), "picker must not open");
+  assert.ok(
+    !argv.some((a) => a.startsWith("plugin pane open")),
+    "picker must not open",
+  );
 });
 
 test("a non-integrated source kind fails with the context message", async () => {
@@ -2865,7 +3528,11 @@ test("a non-integrated source kind fails with the context message", async () => 
 
 test("cancelling the picker leaves nothing created and reports nothing", async () => {
   const { env, calls } = workspace();
-  const out = await run({ destination: "tab", env, pickerChoice: { cancelled: true } });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { cancelled: true },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.cancelled, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
@@ -2875,42 +3542,90 @@ test("cancelling the picker leaves nothing created and reports nothing", async (
 
 test("split handoff splits beside the source, starts, prompts, focuses and notifies", async () => {
   const { env, calls } = workspace();
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: pi → Claude Code (split)");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  const order = ["pane split", "agent start", "agent prompt", "agent focus", "notification show"];
+  const order = [
+    "pane split",
+    "agent start",
+    "agent prompt",
+    "agent focus",
+    "notification show",
+  ];
   let cursor = -1;
   for (const step of order) {
     const at = argv.findIndex((a, i) => i > cursor && a.startsWith(step));
-    assert.ok(at > cursor, `${step} must run after the previous step; got ${JSON.stringify(argv)}`);
+    assert.ok(
+      at > cursor,
+      `${step} must run after the previous step; got ${JSON.stringify(argv)}`,
+    );
     cursor = at;
   }
-  assert.ok(argv.some((a) => a.includes("--pane w5:p1") && a.startsWith("pane split")));
-  assert.ok(argv.some((a) => a.startsWith("pane split") && a.includes("--direction right")));
-  assert.ok(argv.some((a) => a.startsWith("pane split") && a.includes("--no-focus")));
+  assert.ok(
+    argv.some((a) => a.includes("--pane w5:p1") && a.startsWith("pane split")),
+  );
+  assert.ok(
+    argv.some(
+      (a) => a.startsWith("pane split") && a.includes("--direction right"),
+    ),
+  );
+  assert.ok(
+    argv.some((a) => a.startsWith("pane split") && a.includes("--no-focus")),
+  );
 });
 
 test("tab handoff creates a tab in the source workspace and resolves its pane", async () => {
   const { env, calls } = workspace();
-  const out = await run({ destination: "tab", env, pickerChoice: { selected: "codex" } });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { selected: "codex" },
+  });
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: pi → Codex (new tab)");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("tab create") && a.includes("--workspace w5")));
-  assert.ok(argv.some((a) => a.startsWith("pane list")), "must resolve the new tab's pane");
+  assert.ok(
+    argv.some(
+      (a) => a.startsWith("tab create") && a.includes("--workspace w5"),
+    ),
+  );
+  assert.ok(
+    argv.some((a) => a.startsWith("pane list")),
+    "must resolve the new tab's pane",
+  );
 });
 
 test("the source pane is only ever read", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   for (const call of readCalls(calls)) {
     const text = call.join(" ");
     const touchesSource = text.includes("w5:p1");
-    const isRead = text.startsWith("pane get") || text.startsWith("pane split") || text.startsWith("pane list");
-    assert.ok(!touchesSource || isRead, `unexpected write to the source pane: ${text}`);
-    assert.ok(!text.startsWith("pane send-text"), "must never send text to a pane");
-    assert.ok(!text.startsWith("pane send-keys"), "must never send keys to a pane");
+    const isRead =
+      text.startsWith("pane get") ||
+      text.startsWith("pane split") ||
+      text.startsWith("pane list");
+    assert.ok(
+      !touchesSource || isRead,
+      `unexpected write to the source pane: ${text}`,
+    );
+    assert.ok(
+      !text.startsWith("pane send-text"),
+      "must never send text to a pane",
+    );
+    assert.ok(
+      !text.startsWith("pane send-keys"),
+      "must never send keys to a pane",
+    );
     assert.ok(!text.startsWith("pane close"), "must never close a pane");
     assert.ok(!text.startsWith("pane read"), "must never read scrollback");
   }
@@ -2918,8 +3633,14 @@ test("the source pane is only ever read", async () => {
 
 test("the prompt is a single line pointing at HANDOFF.md", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  const prompt = readCalls(calls).find((c) => c[0] === "agent" && c[1] === "prompt");
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
+  const prompt = readCalls(calls).find(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
   assert.ok(prompt, "expected an agent prompt call");
   const text = prompt[3];
   assert.ok(!text.includes("\n"), "prompt must be one line");
@@ -2930,25 +3651,41 @@ test("the prompt is a single line pointing at HANDOFF.md", async () => {
 test("a failed target creation reports and creates no agent", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_FAIL = "pane split";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.targetCreateFailed("split"));
-  assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "start"));
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "start"),
+  );
 });
 
 test("a failed agent start reports and does not prompt", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_FAIL = "agent start";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.startFailed("Claude Code"));
-  assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"));
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"),
+  );
 });
 
 test("a failed prompt reports the prompt failure", async () => {
   const { env } = workspace();
   env.HANDOFF_FAKE_FAIL = "agent prompt";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
 });
@@ -2956,9 +3693,16 @@ test("a failed prompt reports the prompt failure", async () => {
 test("only installed agents are offered to the picker", async () => {
   const { env } = workspace();
   const out = await run({ destination: "tab", env, dryRun: true });
-  assert.deepEqual(out.request.available.map((a) => a.kind).sort(), ["claude", "codex", "pi"]);
+  assert.deepEqual(out.request.available.map((a) => a.kind).sort(), [
+    "claude",
+    "codex",
+    "pi",
+  ]);
   assert.equal(out.request.unavailableCount, 18);
-  assert.equal(out.request.available.find((a) => a.kind === "pi").isSource, true);
+  assert.equal(
+    out.request.available.find((a) => a.kind === "pi").isSource,
+    true,
+  );
 });
 ```
 
@@ -2977,7 +3721,12 @@ if (callsFile) fs.appendFileSync(callsFile, JSON.stringify(argv) + "\n");
 const joined = argv.join(" ");
 const fail = process.env.HANDOFF_FAKE_FAIL;
 if (fail && joined.startsWith(fail)) {
-  process.stdout.write(JSON.stringify({ error: { code: "boom", message: `${fail} failed` }, id: "cli:x" }) + "\n");
+  process.stdout.write(
+    JSON.stringify({
+      error: { code: "boom", message: `${fail} failed` },
+      id: "cli:x",
+    }) + "\n",
+  );
   process.exit(1);
 }
 
@@ -2994,11 +3743,23 @@ if (argv[0] === "pane" && argv[1] === "get") {
   return ok({
     type: "pane_info",
     pane: {
-      pane_id: "w5:p1", terminal_id: "t1", workspace_id: "w5", tab_id: "w5:t1",
-      focused: true, agent_status: "idle", revision: 1,
+      pane_id: "w5:p1",
+      terminal_id: "t1",
+      workspace_id: "w5",
+      tab_id: "w5:t1",
+      focused: true,
+      agent_status: "idle",
+      revision: 1,
       agent: agent || null,
       cwd: process.env.HANDOFF_TEST_HOME || process.cwd(),
-      agent_session: session ? { agent, kind: session.kind, source: `herdr:${agent}`, value: session.value } : null,
+      agent_session: session
+        ? {
+            agent,
+            kind: session.kind,
+            source: `herdr:${agent}`,
+            value: session.value,
+          }
+        : null,
     },
   });
 }
@@ -3007,8 +3768,13 @@ if (argv[0] === "pane" && argv[1] === "split") {
   return ok({
     type: "pane_info",
     pane: {
-      pane_id: "w5:p2", terminal_id: "t2", workspace_id: "w5", tab_id: "w5:t1",
-      focused: false, agent_status: "unknown", revision: 1,
+      pane_id: "w5:p2",
+      terminal_id: "t2",
+      workspace_id: "w5",
+      tab_id: "w5:t1",
+      focused: false,
+      agent_status: "unknown",
+      revision: 1,
     },
   });
 }
@@ -3017,8 +3783,13 @@ if (argv[0] === "tab" && argv[1] === "create") {
   return ok({
     type: "tab_info",
     tab: {
-      tab_id: "w5:t2", workspace_id: "w5", number: 2, label: "handoff",
-      focused: false, pane_count: 1, agent_status: "unknown",
+      tab_id: "w5:t2",
+      workspace_id: "w5",
+      number: 2,
+      label: "handoff",
+      focused: false,
+      pane_count: 1,
+      agent_status: "unknown",
     },
   });
 }
@@ -3027,26 +3798,66 @@ if (argv[0] === "pane" && argv[1] === "list") {
   return ok({
     type: "pane_list",
     panes: [
-      { pane_id: "w5:p1", terminal_id: "t1", workspace_id: "w5", tab_id: "w5:t1", focused: true, agent_status: "idle", revision: 1 },
-      { pane_id: "w5:p9", terminal_id: "t9", workspace_id: "w5", tab_id: "w5:t2", focused: false, agent_status: "unknown", revision: 1 },
+      {
+        pane_id: "w5:p1",
+        terminal_id: "t1",
+        workspace_id: "w5",
+        tab_id: "w5:t1",
+        focused: true,
+        agent_status: "idle",
+        revision: 1,
+      },
+      {
+        pane_id: "w5:p9",
+        terminal_id: "t9",
+        workspace_id: "w5",
+        tab_id: "w5:t2",
+        focused: false,
+        agent_status: "unknown",
+        revision: 1,
+      },
     ],
   });
 }
 
 if (argv[0] === "agent" && argv[1] === "start") {
-  return ok({ type: "agent_started", argv: ["claude"], agent: {
-    terminal_id: "t2", agent_status: "idle", workspace_id: "w5", tab_id: "w5:t1",
-    pane_id: "w5:p2", focused: false, revision: 1, name: argv[2],
-  } });
+  return ok({
+    type: "agent_started",
+    argv: ["claude"],
+    agent: {
+      terminal_id: "t2",
+      agent_status: "idle",
+      workspace_id: "w5",
+      tab_id: "w5:t1",
+      pane_id: "w5:p2",
+      focused: false,
+      revision: 1,
+      name: argv[2],
+    },
+  });
 }
 
-if (argv[0] === "agent" && argv[1] === "prompt") return ok({ type: "agent_prompted" });
-if (argv[0] === "agent" && argv[1] === "focus") return ok({ type: "agent_info", agent: {
-  terminal_id: "t2", agent_status: "idle", workspace_id: "w5", tab_id: "w5:t1",
-  pane_id: "w5:p2", focused: true, revision: 1,
-} });
+if (argv[0] === "agent" && argv[1] === "prompt")
+  return ok({ type: "agent_prompted" });
+if (argv[0] === "agent" && argv[1] === "focus")
+  return ok({
+    type: "agent_info",
+    agent: {
+      terminal_id: "t2",
+      agent_status: "idle",
+      workspace_id: "w5",
+      tab_id: "w5:t1",
+      pane_id: "w5:p2",
+      focused: true,
+      revision: 1,
+    },
+  });
 if (argv[0] === "notification") return ok({ type: "notification_shown" });
-if (argv[0] === "plugin") return ok({ type: "plugin_pane_opened", plugin_pane: { plugin_id: "agent-handoff", entrypoint_id: "picker" } });
+if (argv[0] === "plugin")
+  return ok({
+    type: "plugin_pane_opened",
+    plugin_pane: { plugin_id: "agent-handoff", entrypoint_id: "picker" },
+  });
 
 ok({ type: "unknown" });
 ```
@@ -3086,7 +3897,8 @@ const MESSAGES = {
     "Full handoff unavailable: reading opencode's session store requires Node 22.5 or newer.",
   targetCreateFailed: (dest) =>
     `Handoff failed: could not create the target ${dest}. Source pane untouched.`,
-  startFailed: (name) => `Handoff failed: ${name} did not start. Source pane untouched.`,
+  startFailed: (name) =>
+    `Handoff failed: ${name} did not start. Source pane untouched.`,
   promptFailed: (name) =>
     `Handoff failed: ${name} started but did not accept the handoff. Source pane untouched.`,
   success: (src, tgt, dest) => `Handoff started: ${src} → ${tgt} (${dest})`,
@@ -3192,7 +4004,9 @@ async function run(opts) {
     isSource: a.kind === sourceKind,
   }));
   const availableKinds = new Set(available.map((a) => a.kind));
-  const unavailable = agents.AGENTS.filter((a) => !availableKinds.has(a.kind)).map((a) => ({
+  const unavailable = agents.AGENTS.filter(
+    (a) => !availableKinds.has(a.kind),
+  ).map((a) => ({
     kind: a.kind,
     name: a.name,
   }));
@@ -3231,10 +4045,15 @@ async function run(opts) {
     ipc.writeJson(requestFile, request);
     try {
       call([
-        "plugin", "pane", "open",
-        "--plugin", "agent-handoff",
-        "--entrypoint", "picker",
-        "--env", `HERDR_HANDOFF_REQUEST=${requestFile}`,
+        "plugin",
+        "pane",
+        "open",
+        "--plugin",
+        "agent-handoff",
+        "--entrypoint",
+        "picker",
+        "--env",
+        `HERDR_HANDOFF_REQUEST=${requestFile}`,
         "--focus",
       ]);
     } catch {
@@ -3242,20 +4061,31 @@ async function run(opts) {
       // This is a UI fallback only and never changes what context is transferred.
       try {
         call([
-          "plugin", "pane", "open",
-          "--plugin", "agent-handoff",
-          "--entrypoint", "picker",
-          "--placement", "overlay",
-          "--env", `HERDR_HANDOFF_REQUEST=${requestFile}`,
+          "plugin",
+          "pane",
+          "open",
+          "--plugin",
+          "agent-handoff",
+          "--entrypoint",
+          "picker",
+          "--placement",
+          "overlay",
+          "--env",
+          `HERDR_HANDOFF_REQUEST=${requestFile}`,
           "--focus",
         ]);
       } catch {
         ipc.cleanup([requestFile, resultFile]);
         notify(call, MESSAGES.targetCreateFailed(destLabel(destination)));
-        return { ok: false, message: MESSAGES.targetCreateFailed(destLabel(destination)) };
+        return {
+          ok: false,
+          message: MESSAGES.targetCreateFailed(destLabel(destination)),
+        };
       }
     }
-    choice = await ipc.waitForResult(resultFile, { timeoutMs: pickerTimeoutMs });
+    choice = await ipc.waitForResult(resultFile, {
+      timeoutMs: pickerTimeoutMs,
+    });
     ipc.cleanup([requestFile, resultFile]);
   }
 
@@ -3265,7 +4095,9 @@ async function run(opts) {
     }
   }
 
-  const targetKind = dryRun ? (choice && choice.selected) || sourceKind : choice.selected;
+  const targetKind = dryRun
+    ? (choice && choice.selected) || sourceKind
+    : choice.selected;
   const targetDef = agents.byKind(targetKind);
   const targetName = targetDef ? targetDef.name : targetKind;
   meta.targetKind = targetKind;
@@ -3284,9 +4116,10 @@ async function run(opts) {
     });
     snap = snapshot.write({ resolved, meta, baseDir: handoffsDir });
   } catch (err) {
-    const message = err instanceof SqliteUnavailable && /node:sqlite/.test(err.message)
-      ? MESSAGES.needsNode225
-      : MESSAGES.noContext;
+    const message =
+      err instanceof SqliteUnavailable && /node:sqlite/.test(err.message)
+        ? MESSAGES.needsNode225
+        : MESSAGES.noContext;
     notify(call, message);
     return { ok: false, message };
   }
@@ -3294,7 +4127,10 @@ async function run(opts) {
   const handoffPath = path.join(snap.dir, "HANDOFF.md");
   fs.writeFileSync(
     handoffPath,
-    briefing.render({ snapshot: { ...snap, snapshotUtc: new Date().toISOString() }, meta })
+    briefing.render({
+      snapshot: { ...snap, snapshotUtc: new Date().toISOString() },
+      meta,
+    }),
   );
   try {
     fs.chmodSync(handoffPath, 0o444);
@@ -3312,7 +4148,13 @@ async function run(opts) {
   try {
     if (destination === "tab") {
       const tab = call([
-        "tab", "create", "--workspace", pane.workspace_id, "--no-focus", "--cwd", meta.cwd,
+        "tab",
+        "create",
+        "--workspace",
+        pane.workspace_id,
+        "--no-focus",
+        "--cwd",
+        meta.cwd,
       ]).tab;
       const panes = call(["pane", "list"]).panes || [];
       const found = panes.find((p) => p.tab_id === tab.tab_id);
@@ -3320,8 +4162,15 @@ async function run(opts) {
       targetPaneId = found.pane_id;
     } else {
       targetPaneId = call([
-        "pane", "split", "--pane", sourcePaneId, "--direction", "right",
-        "--no-focus", "--cwd", meta.cwd,
+        "pane",
+        "split",
+        "--pane",
+        sourcePaneId,
+        "--direction",
+        "right",
+        "--no-focus",
+        "--cwd",
+        meta.cwd,
       ]).pane.pane_id;
     }
   } catch {
@@ -3334,8 +4183,15 @@ async function run(opts) {
   const agentName = uniqueAgentName(call, targetKind);
   try {
     call([
-      "agent", "start", agentName, "--kind", targetKind,
-      "--pane", targetPaneId, "--timeout", "60000",
+      "agent",
+      "start",
+      agentName,
+      "--kind",
+      targetKind,
+      "--pane",
+      targetPaneId,
+      "--timeout",
+      "60000",
     ]);
   } catch {
     const message = MESSAGES.startFailed(targetName);
@@ -3345,7 +4201,12 @@ async function run(opts) {
 
   // 8. Deliver the handoff.
   try {
-    call(["agent", "prompt", agentName, briefing.kickoff({ sourceName, handoffPath })]);
+    call([
+      "agent",
+      "prompt",
+      agentName,
+      briefing.kickoff({ sourceName, handoffPath }),
+    ]);
   } catch {
     const message = MESSAGES.promptFailed(targetName);
     notify(call, message);
@@ -3359,7 +4220,11 @@ async function run(opts) {
     // the handoff already landed; focus is cosmetic
   }
 
-  const message = MESSAGES.success(sourceName, targetName, destLabel(destination));
+  const message = MESSAGES.success(
+    sourceName,
+    targetName,
+    destLabel(destination),
+  );
   notify(call, message);
   return { ok: true, message, handoffDir: snap.dir, targetPaneId, agentName };
 }
@@ -3427,11 +4292,13 @@ git commit -m "feat: orchestrate the handoff from source resolution to target ac
 ### Task 12: Keybinding installer
 
 **Files:**
+
 - Create: `lib/keybindings.js`
 - Create: `bin/setup-keys.js`
 - Test: `test/keybindings.test.js`
 
 **Interfaces:**
+
 - Consumes: `lib/herdr.js`.
 - Produces: `lib/keybindings.js` exporting:
   - `BLOCKS: string` — the two `[[keys.command]]` blocks.
@@ -3489,7 +4356,8 @@ test("patch refuses when prefix+a is already bound elsewhere", () => {
 });
 
 test("patch refuses when prefix+shift+a belongs to another command", () => {
-  const existing = '[[keys.command]]\nkey = "prefix+shift+a"\ntype = "popup"\ncommand = "lazygit"\n';
+  const existing =
+    '[[keys.command]]\nkey = "prefix+shift+a"\ntype = "popup"\ncommand = "lazygit"\n';
   const out = kb.patch(existing);
   assert.equal(out.changed, false);
   assert.deepEqual(out.conflicts, ["prefix+shift+a"]);
@@ -3526,7 +4394,10 @@ test("patch replaces a stale block rather than duplicating it", () => {
 
 test("findConfigPath prefers HERDR_CONFIG_PATH", () => {
   const p = path.join(path.sep, "custom", "config.toml");
-  assert.equal(kb.findConfigPath({ env: { HERDR_CONFIG_PATH: p }, helpOutput: "" }), p);
+  assert.equal(
+    kb.findConfigPath({ env: { HERDR_CONFIG_PATH: p }, helpOutput: "" }),
+    p,
+  );
 });
 
 test("findConfigPath reads the Config line from herdr --help", () => {
@@ -3536,8 +4407,14 @@ test("findConfigPath reads the Config line from herdr --help", () => {
 });
 
 test("findConfigPath falls back to the documented default", () => {
-  const got = kb.findConfigPath({ env: { HOME: path.join(path.sep, "h") }, helpOutput: "" });
-  assert.equal(got, path.join(path.sep, "h", ".config", "herdr", "config.toml"));
+  const got = kb.findConfigPath({
+    env: { HOME: path.join(path.sep, "h") },
+    helpOutput: "",
+  });
+  assert.equal(
+    got,
+    path.join(path.sep, "h", ".config", "herdr", "config.toml"),
+  );
 });
 ```
 
@@ -3596,7 +4473,7 @@ function stripOurBlocks(text) {
   const flush = () => {
     if (!block) return;
     const isOurs = block.some((line) =>
-      ACTIONS.some((action) => line.includes(`"${action}"`))
+      ACTIONS.some((action) => line.includes(`"${action}"`)),
     );
     if (!isOurs) keep.push(...block);
     block = null;
@@ -3631,8 +4508,12 @@ function patch(text, opts = {}) {
   const { force = false } = opts;
   const original = text;
   const alreadyInstalled =
-    ACTIONS.every((action) => activeLines(text).some((line) => line.includes(`"${action}"`))) &&
-    KEYS.every((key) => activeLines(text).some((line) => line.includes(`"${key}"`)));
+    ACTIONS.every((action) =>
+      activeLines(text).some((line) => line.includes(`"${action}"`)),
+    ) &&
+    KEYS.every((key) =>
+      activeLines(text).some((line) => line.includes(`"${key}"`)),
+    );
 
   if (alreadyInstalled) {
     return { text: original, changed: false, conflicts: [] };
@@ -3641,7 +4522,9 @@ function patch(text, opts = {}) {
   const cleaned = stripOurBlocks(text);
   const conflicts = [];
   for (const key of KEYS) {
-    const bound = activeLines(cleaned).some((line) => line.includes(`"${key}"`));
+    const bound = activeLines(cleaned).some((line) =>
+      line.includes(`"${key}"`),
+    );
     if (bound) conflicts.push(key);
   }
 
@@ -3650,7 +4533,8 @@ function patch(text, opts = {}) {
   }
 
   const base = cleaned.replace(/\s*$/, "");
-  const next = (base.length > 0 ? base + "\n" : "") + BLOCKS.replace(/^\n/, "\n");
+  const next =
+    (base.length > 0 ? base + "\n" : "") + BLOCKS.replace(/^\n/, "\n");
   return { text: next.replace(/^\n+/, ""), changed: true, conflicts: [] };
 }
 
@@ -3686,7 +4570,10 @@ function notify(title) {
 
 function main() {
   const force = process.argv.includes("--force");
-  const configPath = kb.findConfigPath({ env: process.env, helpOutput: helpOutput() });
+  const configPath = kb.findConfigPath({
+    env: process.env,
+    helpOutput: helpOutput(),
+  });
 
   if (!configPath) {
     process.stderr.write("agent-handoff: could not locate config.toml\n");
@@ -3709,9 +4596,11 @@ function main() {
   if (!out.changed && out.conflicts.length > 0) {
     const list = out.conflicts.join(", ");
     process.stderr.write(
-      `agent-handoff: ${list} already bound to something else; re-run with --force to override\n`
+      `agent-handoff: ${list} already bound to something else; re-run with --force to override\n`,
     );
-    notify(`Agent Handoff: ${list} already bound. Re-run setup-keys with --force.`);
+    notify(
+      `Agent Handoff: ${list} already bound. Re-run setup-keys with --force.`,
+    );
     process.exit(1);
   }
 
@@ -3727,7 +4616,9 @@ function main() {
   try {
     herdr.run(["server", "reload-config"]);
   } catch (err) {
-    process.stderr.write(`agent-handoff: reload-config failed: ${err.message}\n`);
+    process.stderr.write(
+      `agent-handoff: reload-config failed: ${err.message}\n`,
+    );
     notify("Agent Handoff: keys written, reload config manually");
     process.exit(1);
   }
@@ -3756,10 +4647,12 @@ git commit -m "feat: add opt-in keybinding installer with conflict detection"
 ### Task 13: README and live verification
 
 **Files:**
+
 - Create: `README.md`
 - Test: manual, against the running Herdr session
 
 **Interfaces:**
+
 - Consumes: everything.
 - Produces: documentation and a verified working plugin.
 
@@ -3777,7 +4670,7 @@ Expected: `clean`
 
 Create `README.md`:
 
-```markdown
+````markdown
 # Agent Handoff
 
 A Herdr plugin that transfers an in-progress task from the agent in the active pane to a **fresh
@@ -3792,7 +4685,7 @@ The source pane is never closed, interrupted, modified, or sent input.
 ## Requirements
 
 - Herdr 0.7.5 or newer
-- Node.js 18 or newer on `PATH` (Node 22.5+ if you want to hand off *from* opencode)
+- Node.js 18 or newer on `PATH` (Node 22.5+ if you want to hand off _from_ opencode)
 
 ## Install
 
@@ -3800,6 +4693,7 @@ The source pane is never closed, interrupted, modified, or sent input.
 herdr plugin link /path/to/agent-handoff
 herdr plugin action invoke agent-handoff.setup-keys
 ```
+````
 
 `setup-keys` backs up your `config.toml`, appends the two `[[keys.command]]` blocks, and reloads the
 config. It refuses to overwrite `prefix+a` or `prefix+shift+a` if you have already bound them —
@@ -3870,7 +4764,8 @@ npm test                                   # node:test, no dependencies
 node bin/handoff-split.js --dry-run        # resolve + snapshot, create nothing
 herdr plugin log list --plugin agent-handoff
 ```
-```
+
+````
 
 - [ ] **Step 4: Link the plugin and confirm the manifest is accepted**
 
@@ -3878,7 +4773,7 @@ herdr plugin log list --plugin agent-handoff
 herdr plugin link .
 herdr plugin list
 herdr plugin action list --plugin agent-handoff
-```
+````
 
 Expected: the plugin appears as `agent-handoff`, and all three actions (`handoff-split`,
 `handoff-tab`, `setup-keys`) are listed. If the manifest is rejected, the error names the offending
@@ -3938,21 +4833,21 @@ git commit -m "docs: document install, agent support and failure behaviour"
 
 **Spec coverage**
 
-| Spec section | Task |
-|---|---|
-| §2.5 popup modal, manifest title | 1 (manifest), 9–10 (picker) |
-| §2.6 keybindings in config.toml | 1 (manifest actions), 12 (installer) |
-| §2.8 CLI calls, §2.9 Windows socket avoidance | 2 |
-| §2.3/§2.4 source vs target kinds | 3 |
-| §3, §3.1 file strategy resolvers | 4 |
-| §3.2 opencode SQLite strategy | 5 |
-| §8 context package, chunking, read-only, retention | 6 |
-| §9 briefing and kickoff prompt | 7 |
-| §7 step 6 picker IPC | 8 |
-| §6 modal UX, keyboard and mouse | 9, 10 |
-| §7 orchestration, §10 error catalogue | 11 |
-| §5 setup-keys | 12 |
-| §11 live smoke tests, §12 limitations | 13 |
+| Spec section                                       | Task                                 |
+| -------------------------------------------------- | ------------------------------------ |
+| §2.5 popup modal, manifest title                   | 1 (manifest), 9–10 (picker)          |
+| §2.6 keybindings in config.toml                    | 1 (manifest actions), 12 (installer) |
+| §2.8 CLI calls, §2.9 Windows socket avoidance      | 2                                    |
+| §2.3/§2.4 source vs target kinds                   | 3                                    |
+| §3, §3.1 file strategy resolvers                   | 4                                    |
+| §3.2 opencode SQLite strategy                      | 5                                    |
+| §8 context package, chunking, read-only, retention | 6                                    |
+| §9 briefing and kickoff prompt                     | 7                                    |
+| §7 step 6 picker IPC                               | 8                                    |
+| §6 modal UX, keyboard and mouse                    | 9, 10                                |
+| §7 orchestration, §10 error catalogue              | 11                                   |
+| §5 setup-keys                                      | 12                                   |
+| §11 live smoke tests, §12 limitations              | 13                                   |
 
 **Type consistency check:** `sources.resolve` returns `{strategy, path, bytes, lines}` or
 `{strategy, dbPath, sessionId}`; `snapshot.write` consumes exactly that shape as `resolved` and

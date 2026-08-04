@@ -23,9 +23,17 @@ test("ranges cover every line exactly once with no gap and no overlap", () => {
   const total = 9_733;
   const r = ranges(total);
   assert.equal(r.list[0].first, 1);
-  assert.equal(r.list[r.list.length - 1].last, total, "the last range ends at N");
+  assert.equal(
+    r.list[r.list.length - 1].last,
+    total,
+    "the last range ends at N",
+  );
   for (let i = 1; i < r.list.length; i += 1) {
-    assert.equal(r.list[i].first, r.list[i - 1].last + 1, `range ${i} starts right after ${i - 1}`);
+    assert.equal(
+      r.list[i].first,
+      r.list[i - 1].last + 1,
+      `range ${i} starts right after ${i - 1}`,
+    );
   }
   const covered = r.list.reduce((sum, x) => sum + (x.last - x.first + 1), 0);
   assert.equal(covered, total, "every line is covered exactly once");

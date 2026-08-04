@@ -14,7 +14,10 @@ test("stateDir falls back to a cwd-relative dir when env is absent", () => {
 });
 
 test("stripVerbatim removes the Windows \\\\?\\ prefix", () => {
-  assert.equal(paths.stripVerbatim("\\\\?\\C:\\Users\\sanir\\Herdr plugin"), "C:\\Users\\sanir\\Herdr plugin");
+  assert.equal(
+    paths.stripVerbatim("\\\\?\\C:\\Users\\sanir\\Herdr plugin"),
+    "C:\\Users\\sanir\\Herdr plugin",
+  );
 });
 
 test("stripVerbatim leaves ordinary paths untouched", () => {
@@ -27,7 +30,7 @@ test("stripVerbatim leaves ordinary paths untouched", () => {
 test("pluginRoot returns HERDR_PLUGIN_ROOT with the verbatim prefix stripped", () => {
   assert.equal(
     paths.pluginRoot({ HERDR_PLUGIN_ROOT: "\\\\?\\C:\\p" }),
-    "C:\\p"
+    "C:\\p",
   );
 });
 

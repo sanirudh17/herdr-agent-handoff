@@ -31,7 +31,10 @@ function trace(message) {
     if (fs.existsSync(TRACE) && fs.statSync(TRACE).size > TRACE_MAX_BYTES) {
       fs.rmSync(TRACE, { force: true });
     }
-    fs.appendFileSync(TRACE, `${new Date().toISOString()} pid=${process.pid} ${message}\n`);
+    fs.appendFileSync(
+      TRACE,
+      `${new Date().toISOString()} pid=${process.pid} ${message}\n`,
+    );
   } catch {
     // diagnostics must never break the picker
   }
@@ -82,10 +85,13 @@ function runHeadless(request) {
   try {
     input = fs.readFileSync(0, "utf8");
   } catch {
-    input = "";
+    // stdin closed or not a file; nothing to read
   }
 
-  for (const key of input.split("\n").map((k) => k.trim()).filter(Boolean)) {
+  for (const key of input
+    .split("\n")
+    .map((k) => k.trim())
+    .filter(Boolean)) {
     const out = ui.applyKey(state, key);
     state = out.state;
     drawHeadless(state);
@@ -128,9 +134,10 @@ function runInteractive(request) {
         state = ui.applyHover(state, event.row, event.col);
         continue;
       }
-      const out = event.type === "mouse"
-        ? ui.applyClick(state, event.row, event.col)
-        : ui.applyKey(state, event.name);
+      const out =
+        event.type === "mouse"
+          ? ui.applyClick(state, event.row, event.col)
+          : ui.applyKey(state, event.name);
       state = out.state;
       if (out.action && out.action.dismissUpdate) {
         updateMod.dismissUpdate(out.action.dismissUpdate);
@@ -140,8 +147,13 @@ function runInteractive(request) {
         // acknowledged rather than the modal just blinking out.
         draw(state, ui.renderChosenFrame(state, { styled: true }));
         setTimeout(
-          () => finish(request.resultPath, { selected: out.action.select }, teardown),
-          CONFIRM_MS
+          () =>
+            finish(
+              request.resultPath,
+              { selected: out.action.select },
+              teardown,
+            ),
+          CONFIRM_MS,
         );
         return;
       }
@@ -174,8 +186,8 @@ function runInteractive(request) {
 function main() {
   trace(
     `start headless=${HEADLESS} cwd=${process.cwd()} ` +
-    `isTTY=${Boolean(process.stdin.isTTY)} cols=${process.stdout.columns} rows=${process.stdout.rows} ` +
-    `request=${process.env.HERDR_HANDOFF_REQUEST || "UNSET"}`
+      `isTTY=${Boolean(process.stdin.isTTY)} cols=${process.stdout.columns} rows=${process.stdout.rows} ` +
+      `request=${process.env.HERDR_HANDOFF_REQUEST || "UNSET"}`,
   );
 
   process.on("uncaughtException", (err) => {

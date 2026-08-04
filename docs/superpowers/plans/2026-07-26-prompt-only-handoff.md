@@ -28,10 +28,12 @@
 ### Task 1: Line-range arithmetic
 
 **Files:**
+
 - Create: `lib/ranges.js`
 - Test: `test/ranges.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `ranges(totalLines, opts) -> { list: Array<{first:number,last:number}>, truncated:boolean, perRange:number, total:number }`. `opts` is `{ perRange = 1200, maxListed = 40 }`. `first`/`last` are 1-indexed and inclusive. When `truncated` is true, `list` holds the first `maxListed` ranges and the caller states a rule instead of enumerating.
 
@@ -64,9 +66,17 @@ test("ranges cover every line exactly once with no gap and no overlap", () => {
   const total = 9_733;
   const r = ranges(total);
   assert.equal(r.list[0].first, 1);
-  assert.equal(r.list[r.list.length - 1].last, total, "the last range ends at N");
+  assert.equal(
+    r.list[r.list.length - 1].last,
+    total,
+    "the last range ends at N",
+  );
   for (let i = 1; i < r.list.length; i += 1) {
-    assert.equal(r.list[i].first, r.list[i - 1].last + 1, `range ${i} starts right after ${i - 1}`);
+    assert.equal(
+      r.list[i].first,
+      r.list[i - 1].last + 1,
+      `range ${i} starts right after ${i - 1}`,
+    );
   }
   const covered = r.list.reduce((sum, x) => sum + (x.last - x.first + 1), 0);
   assert.equal(covered, total, "every line is covered exactly once");
@@ -143,10 +153,12 @@ git commit -m "feat: order a transcript into line ranges instead of copying part
 ### Task 2: Readability gate
 
 **Files:**
+
 - Modify: `lib/snapshot.js`
 - Test: `test/snapshot.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `isReadableText(buffer) -> boolean`, exported from `lib/snapshot.js`. True only when the first 64 KB has no NUL byte, decodes as UTF-8 without a U+FFFD replacement character, and contains at least one newline.
 
@@ -163,7 +175,11 @@ test("line-oriented UTF-8 text is readable", () => {
 });
 
 test("a NUL byte means it is not text a target can read", () => {
-  const body = Buffer.concat([Buffer.from('{"a":1}\n'), Buffer.from([0x00]), Buffer.from("more\n")]);
+  const body = Buffer.concat([
+    Buffer.from('{"a":1}\n'),
+    Buffer.from([0x00]),
+    Buffer.from("more\n"),
+  ]);
   assert.equal(isReadableText(body), false);
 });
 
@@ -174,7 +190,10 @@ test("invalid UTF-8 is not readable", () => {
 });
 
 test("text with no newline at all is not line-oriented", () => {
-  assert.equal(isReadableText(Buffer.from("one single line, no terminator", "utf8")), false);
+  assert.equal(
+    isReadableText(Buffer.from("one single line, no terminator", "utf8")),
+    false,
+  );
 });
 
 test("only the first 64KB is probed, so a late NUL does not disqualify a huge transcript", () => {
@@ -232,10 +251,12 @@ git commit -m "feat: gate the reference mode on the native file being readable l
 ### Task 3: Extract opencode rows without writing a file
 
 **Files:**
+
 - Modify: `lib/source-sqlite.js`
 - Test: `test/source-sqlite.test.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `extractToBuffer({ dbPath, sessionId, workDir, mode }) -> { body: Buffer, lines: number, counts: object, opened: "direct"|"copy" }`. Writes nothing. `workDir` is used only by the copy fallback and defaults to a fresh directory under `os.tmpdir()`; any copy it makes is removed before returning. `extract({...})` keeps its current signature and return shape (`{ jsonlPath, lines, bytes, counts, opened }`) and is now a thin wrapper that writes `body` to `workDir`.
 - Also produces: `exportPathFor(dbPath, sessionId) -> string`, the single file the opencode exception writes: `<dirname(dbPath)>/herdr-handoff-<sessionId>.jsonl`.
@@ -248,18 +269,20 @@ Append to `test/source-sqlite.test.js`. Reuse whatever helper that file already 
 const { extractToBuffer, exportPathFor } = require("../lib/source-sqlite.js");
 
 test("extractToBuffer returns the same bytes extract writes, and touches no disk", (t) => {
-  const { dbPath, sessionId } = makeDb();           // same helper the file already uses
+  const { dbPath, sessionId } = makeDb(); // same helper the file already uses
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "oc-buf-"));
 
   const inMemory = extractToBuffer({ dbPath, sessionId, workDir });
   assert.deepEqual(
-    fs.readdirSync(workDir), [],
+    fs.readdirSync(workDir),
+    [],
     "extractToBuffer must not leave anything behind, not even a copy",
   );
 
   const onDisk = extract({ dbPath, sessionId, workDir });
   assert.deepEqual(
-    inMemory.body, fs.readFileSync(onDisk.jsonlPath),
+    inMemory.body,
+    fs.readFileSync(onDisk.jsonlPath),
     "the buffer is byte-identical to the exported file",
   );
   assert.equal(inMemory.lines, onDisk.lines);
@@ -286,11 +309,14 @@ In `lib/source-sqlite.js`, rename the body of `extract` to `extractToBuffer`, dr
 function extractToBuffer({ dbPath, sessionId, workDir, mode = "auto" }) {
   const sqlite = loadSqlite();
   if (!sqlite) {
-    throw new SqliteUnavailable("node:sqlite is unavailable; Node 22.5 or newer is required");
+    throw new SqliteUnavailable(
+      "node:sqlite is unavailable; Node 22.5 or newer is required",
+    );
   }
 
   // Only the copy fallback needs somewhere to work, and it cleans up after itself.
-  const scratch = workDir || fs.mkdtempSync(path.join(os.tmpdir(), "herdr-oc-"));
+  const scratch =
+    workDir || fs.mkdtempSync(path.join(os.tmpdir(), "herdr-oc-"));
   const { db, opened, copies } = openReadOnly(sqlite, dbPath, scratch, mode);
   const counts = {};
   const chunks = [];
@@ -302,7 +328,9 @@ function extractToBuffer({ dbPath, sessionId, workDir, mode = "auto" }) {
         continue;
       }
       const rows = db
-        .prepare(`SELECT * FROM "${table.name}" WHERE "${table.where}" = ? ORDER BY ${table.order}`)
+        .prepare(
+          `SELECT * FROM "${table.name}" WHERE "${table.where}" = ? ORDER BY ${table.order}`,
+        )
         .all(sessionId);
       counts[table.name] = rows.length;
       for (const row of rows) {
@@ -311,10 +339,14 @@ function extractToBuffer({ dbPath, sessionId, workDir, mode = "auto" }) {
     }
 
     if (counts.session === 0) {
-      throw new SqliteUnavailable(`no opencode session found for id ${sessionId}`);
+      throw new SqliteUnavailable(
+        `no opencode session found for id ${sessionId}`,
+      );
     }
     if (counts.message === 0) {
-      throw new SqliteUnavailable(`opencode session ${sessionId} has no messages`);
+      throw new SqliteUnavailable(
+        `opencode session ${sessionId} has no messages`,
+      );
     }
 
     const body = Buffer.from(chunks.join(""), "utf8");
@@ -325,12 +357,14 @@ function extractToBuffer({ dbPath, sessionId, workDir, mode = "auto" }) {
     for (const table of TABLES) {
       if (!tableExists(db, table.name)) continue;
       recount += db
-        .prepare(`SELECT COUNT(*) AS c FROM "${table.name}" WHERE "${table.where}" = ?`)
+        .prepare(
+          `SELECT COUNT(*) AS c FROM "${table.name}" WHERE "${table.where}" = ?`,
+        )
         .get(sessionId).c;
     }
     if (recount !== emitted) {
       throw new SqliteUnavailable(
-        `opencode export is incomplete: emitted ${emitted} rows but the database holds ${recount}`
+        `opencode export is incomplete: emitted ${emitted} rows but the database holds ${recount}`,
       );
     }
 
@@ -362,7 +396,13 @@ function extract(opts) {
   fs.mkdirSync(opts.workDir, { recursive: true });
   const jsonlPath = path.join(opts.workDir, "opencode-session.jsonl");
   fs.writeFileSync(jsonlPath, result.body);
-  return { jsonlPath, lines: result.lines, bytes: result.bytes, counts: result.counts, opened: result.opened };
+  return {
+    jsonlPath,
+    lines: result.lines,
+    bytes: result.bytes,
+    counts: result.counts,
+    opened: result.opened,
+  };
 }
 
 function exportPathFor(dbPath, sessionId) {
@@ -389,10 +429,12 @@ git commit -m "feat: read an opencode session into memory instead of onto disk"
 ### Task 4: Measure the session instead of copying it
 
 **Files:**
+
 - Modify: `lib/snapshot.js`
 - Test: `test/snapshot.test.js`
 
 **Interfaces:**
+
 - Consumes: `isReadableText` (Task 2), `extractToBuffer` (Task 3).
 - Produces: `measure({ resolved }) -> { strategy, nativePath, body: Buffer, bytes, lines, sha256, counts, readable }`. `nativePath` is the source agent's own file, or the database path for opencode. `counts` is the opencode row-count map or `null`. `readable` is `isReadableText(body)`.
 - Removed, and every caller updated: `write`, `prune`, `makeReadOnly`, `stamp`, `MAX_BYTES`, `KEEP`. `chunk` is removed too — Task 1 replaced it.
@@ -410,7 +452,11 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { measure, isReadableText, READABLE_PROBE_BYTES } = require("../lib/snapshot.js");
+const {
+  measure,
+  isReadableText,
+  READABLE_PROBE_BYTES,
+} = require("../lib/snapshot.js");
 
 // ... the six isReadableText tests from Task 2 go here ...
 
@@ -432,16 +478,26 @@ test("a file session is measured, hashed and left exactly where it is", () => {
   assert.equal(m.nativePath, file);
   assert.equal(m.bytes, Buffer.byteLength(contents));
   assert.equal(m.lines, 3);
-  assert.equal(m.sha256, crypto.createHash("sha256").update(contents).digest("hex"));
+  assert.equal(
+    m.sha256,
+    crypto.createHash("sha256").update(contents).digest("hex"),
+  );
   assert.equal(m.readable, true);
   assert.equal(m.counts, null);
-  assert.equal(m.body.toString("utf8"), contents, "the body is the file byte for byte");
+  assert.equal(
+    m.body.toString("utf8"),
+    contents,
+    "the body is the file byte for byte",
+  );
   assert.deepEqual(fs.readdirSync(dir), before, "measuring writes nothing");
 });
 
 test("a final line without a trailing newline still counts", () => {
   const { file } = tempFile('{"n":1}\n{"n":2}');
-  assert.equal(measure({ resolved: { strategy: "file", path: file } }).lines, 2);
+  assert.equal(
+    measure({ resolved: { strategy: "file", path: file } }).lines,
+    2,
+  );
 });
 
 test("an unreadable native file is measured but flagged, not thrown on", () => {
@@ -453,7 +509,11 @@ test("an unreadable native file is measured but flagged, not thrown on", () => {
 test("measure no longer offers the copying API", () => {
   const snapshot = require("../lib/snapshot.js");
   for (const gone of ["write", "prune", "chunk"]) {
-    assert.equal(snapshot[gone], undefined, `${gone} should be gone: nothing is copied any more`);
+    assert.equal(
+      snapshot[gone],
+      undefined,
+      `${gone} should be gone: nothing is copied any more`,
+    );
   }
 });
 ```
@@ -472,11 +532,17 @@ Rewrite `lib/snapshot.js` to only measure. Keep `isReadableText` from Task 2.
 
 const crypto = require("node:crypto");
 const fs = require("node:fs");
-const { extractToBuffer, hasSqlite, SqliteUnavailable } = require("./source-sqlite.js");
+const {
+  extractToBuffer,
+  hasSqlite,
+  SqliteUnavailable,
+} = require("./source-sqlite.js");
 
 const READABLE_PROBE_BYTES = 64 * 1024;
 
-function isReadableText(buffer) { /* exactly as written in Task 2 */ }
+function isReadableText(buffer) {
+  /* exactly as written in Task 2 */
+}
 
 function countLines(buffer) {
   if (buffer.length === 0) return 0;
@@ -492,9 +558,14 @@ function countLines(buffer) {
 function measure({ resolved }) {
   if (resolved.strategy === "sqlite") {
     if (!hasSqlite()) {
-      throw new SqliteUnavailable("node:sqlite is unavailable; Node 22.5 or newer is required");
+      throw new SqliteUnavailable(
+        "node:sqlite is unavailable; Node 22.5 or newer is required",
+      );
     }
-    const exported = extractToBuffer({ dbPath: resolved.dbPath, sessionId: resolved.sessionId });
+    const exported = extractToBuffer({
+      dbPath: resolved.dbPath,
+      sessionId: resolved.sessionId,
+    });
     return {
       strategy: "sqlite",
       nativePath: resolved.dbPath,
@@ -540,10 +611,12 @@ git commit -m "refactor: measure the source session rather than copying it"
 ### Task 5: The inline prompt
 
 **Files:**
+
 - Modify: `lib/briefing.js`
 - Test: `test/briefing.test.js`
 
 **Interfaces:**
+
 - Consumes: `measure()` output (Task 4).
 - Produces: `renderInline({ meta, session }) -> string` and the constants `SENTINEL` and `PROMPT_BUDGET` (30000), all exported from `lib/briefing.js`. `meta` is the object `handoff.run` already builds: `{ sourceKind, sourceName, targetKind, targetName, sessionId, sourcePaneId, workspaceId, tabId, cwd, destination, strategy, snapshotUtc }`. `session` is `measure()`'s return.
 - `kickoff()` and `partsTable()` are removed.
@@ -560,45 +633,68 @@ const assert = require("node:assert/strict");
 const { renderInline, SENTINEL, PROMPT_BUDGET } = require("../lib/briefing.js");
 
 const META = {
-  sourceKind: "codex", sourceName: "Codex",
-  targetKind: "claude", targetName: "Claude Code",
+  sourceKind: "codex",
+  sourceName: "Codex",
+  targetKind: "claude",
+  targetName: "Claude Code",
   sessionId: "019d4393-fd0e-77f2-88a2-782589d290a5",
-  sourcePaneId: "w6:p1", workspaceId: "w6", tabId: "w6:t1",
+  sourcePaneId: "w6:p1",
+  workspaceId: "w6",
+  tabId: "w6:t1",
   cwd: "C:\\Users\\sanir\\Herdr plugin",
-  destination: "tab", strategy: "file",
+  destination: "tab",
+  strategy: "file",
   snapshotUtc: "2026-07-26T09:30:00.000Z",
 };
 
 function sessionOf(text) {
   const body = Buffer.from(text, "utf8");
   return {
-    strategy: "file", nativePath: "C:\\x\\rollout-1.jsonl", body,
-    bytes: body.length, lines: text.split("\n").length - 1,
-    sha256: "a".repeat(64), counts: null, readable: true,
+    strategy: "file",
+    nativePath: "C:\\x\\rollout-1.jsonl",
+    body,
+    bytes: body.length,
+    lines: text.split("\n").length - 1,
+    sha256: "a".repeat(64),
+    counts: null,
+    readable: true,
   };
 }
 
 test("the prompt opens by telling the target it is taking over, and names the source", () => {
   const text = renderInline({ meta: META, session: sessionOf('{"n":1}\n') });
-  assert.match(text, /^You are taking over this session from \*\*Codex\*\*/,
-    "this exact opening was the requirement");
+  assert.match(
+    text,
+    /^You are taking over this session from \*\*Codex\*\*/,
+    "this exact opening was the requirement",
+  );
 });
 
 test("the transcript is embedded verbatim, byte for byte", () => {
-  const transcript = '{"role":"user","text":"hello ─ ❯ world"}\n{"role":"assistant"}\n';
+  const transcript =
+    '{"role":"user","text":"hello ─ ❯ world"}\n{"role":"assistant"}\n';
   const text = renderInline({ meta: META, session: sessionOf(transcript) });
-  assert.ok(text.includes(transcript), "no escaping, no reflowing, no truncation");
+  assert.ok(
+    text.includes(transcript),
+    "no escaping, no reflowing, no truncation",
+  );
 });
 
 test("the prompt states what to verify the transcript against", () => {
   const s = sessionOf('{"n":1}\n');
   const text = renderInline({ meta: META, session: s });
-  assert.ok(text.includes(s.sha256), "the hash is stated so the target can confirm");
+  assert.ok(
+    text.includes(s.sha256),
+    "the hash is stated so the target can confirm",
+  );
   assert.ok(text.includes(String(s.bytes)), "so is the byte count");
 });
 
 test("all six rules survive into the prompt", () => {
-  const text = renderInline({ meta: META, session: sessionOf('{"n":1}\n') }).toLowerCase();
+  const text = renderInline({
+    meta: META,
+    session: sessionOf('{"n":1}\n'),
+  }).toLowerCase();
   for (const rule of [
     "read the complete source session before acting",
     "treat it as historical context",
@@ -619,7 +715,10 @@ test("the source pane is declared off limits and named", () => {
 
 test("the prompt ends with the sentinel, because that is the delivery marker", () => {
   const text = renderInline({ meta: META, session: sessionOf('{"n":1}\n') });
-  assert.ok(text.trimEnd().endsWith(SENTINEL), "the marker must be the last thing on screen");
+  assert.ok(
+    text.trimEnd().endsWith(SENTINEL),
+    "the marker must be the last thing on screen",
+  );
   assert.equal(SENTINEL, "-- end of handoff, begin now --");
 });
 
@@ -631,7 +730,10 @@ test("no reference to a handoff document survives", () => {
 
 test("the prose alone leaves real room for a transcript", () => {
   const overhead = renderInline({ meta: META, session: sessionOf("") }).length;
-  assert.ok(overhead < 5000, `prose overhead is ${overhead}; it must leave >25k for the transcript`);
+  assert.ok(
+    overhead < 5000,
+    `prose overhead is ${overhead}; it must leave >25k for the transcript`,
+  );
   assert.ok(PROMPT_BUDGET === 30000);
 });
 
@@ -780,10 +882,12 @@ git commit -m "feat: carry the whole session inside the prompt when it fits"
 ### Task 6: The reference prompt
 
 **Files:**
+
 - Modify: `lib/briefing.js`
 - Test: `test/briefing.test.js`
 
 **Interfaces:**
+
 - Consumes: `ranges()` (Task 1), `renderInline`'s shared helpers (Task 5).
 - Produces: `renderReference({ meta, session }) -> string`, exported from `lib/briefing.js`. It calls `ranges(session.lines)` itself.
 
@@ -798,9 +902,14 @@ const { PER_RANGE, MAX_LISTED } = require("../lib/ranges.js");
 function bigSession(lines) {
   return {
     strategy: "file",
-    nativePath: "C:\\Users\\sanir\\.codex\\sessions\\rollout-2026-03-31-019d4393.jsonl",
-    body: Buffer.alloc(0), bytes: 581_632, lines,
-    sha256: "b".repeat(64), counts: null, readable: true,
+    nativePath:
+      "C:\\Users\\sanir\\.codex\\sessions\\rollout-2026-03-31-019d4393.jsonl",
+    body: Buffer.alloc(0),
+    bytes: 581_632,
+    lines,
+    sha256: "b".repeat(64),
+    counts: null,
+    readable: true,
   };
 }
 
@@ -817,7 +926,10 @@ test("line ranges are enumerated in order and stop at the pinned last line", () 
   const text = renderReference({ meta: META, session: bigSession(3000) });
   assert.ok(text.includes("1–1200"));
   assert.ok(text.includes("1201–2400"));
-  assert.ok(text.includes("2401–3000"), "the last range ends at N, not at a round number");
+  assert.ok(
+    text.includes("2401–3000"),
+    "the last range ends at N, not at a round number",
+  );
 });
 
 test("reading past the pinned line is ruled out, because the file is live", () => {
@@ -828,9 +940,15 @@ test("reading past the pinned line is ruled out, because the file is live", () =
 test("a very long session states the rule instead of listing every range", () => {
   const s = bigSession(PER_RANGE * (MAX_LISTED + 25));
   const text = renderReference({ meta: META, session: s });
-  assert.ok(!text.includes(`${PER_RANGE * (MAX_LISTED + 20)}`), "no unbounded enumeration");
+  assert.ok(
+    !text.includes(`${PER_RANGE * (MAX_LISTED + 20)}`),
+    "no unbounded enumeration",
+  );
   assert.match(text, /each following 1,200 lines/i, "a stated rule takes over");
-  assert.ok(text.length < PROMPT_BUDGET, `reference prompt is ${text.length}, over budget`);
+  assert.ok(
+    text.length < PROMPT_BUDGET,
+    `reference prompt is ${text.length}, over budget`,
+  );
 });
 
 test("the reference prompt also ends with the sentinel", () => {
@@ -908,10 +1026,12 @@ git commit -m "feat: point at the agent's own transcript when it will not fit"
 ### Task 7: Budget and mode selection
 
 **Files:**
+
 - Modify: `lib/briefing.js`
 - Test: `test/briefing.test.js`
 
 **Interfaces:**
+
 - Consumes: `renderInline` (Task 5), `renderReference` (Task 6), `isReadableText` result carried on `session.readable` (Task 2/4).
 - Produces: `build({ meta, session }) -> { text, mode, markers } | null`. `mode` is `"inline"` or `"reference"`. `markers` is `[SENTINEL]` for inline, and `[SENTINEL, path.basename(session.nativePath)]` for reference. Returns **`null`** when the session is over budget and `session.readable` is false — the caller turns that into `MESSAGES.noContext`.
 
@@ -927,9 +1047,14 @@ function fileSessionOfSize(bytes) {
   const line = '{"pad":"' + "x".repeat(98) + '"}\n';
   const body = Buffer.from(line.repeat(Math.ceil(bytes / line.length)), "utf8");
   return {
-    strategy: "file", nativePath: "C:\\x\\rollout-1.jsonl", body,
-    bytes: body.length, lines: body.toString("utf8").split("\n").length - 1,
-    sha256: "c".repeat(64), counts: null, readable: true,
+    strategy: "file",
+    nativePath: "C:\\x\\rollout-1.jsonl",
+    body,
+    bytes: body.length,
+    lines: body.toString("utf8").split("\n").length - 1,
+    sha256: "c".repeat(64),
+    counts: null,
+    readable: true,
   };
 }
 
@@ -948,9 +1073,14 @@ test("a large session switches to a reference, and says which file to look for",
 test("both modes stay under the prompt budget, and well under the hard ceiling", () => {
   for (const bytes of [0, 1000, 20_000, 26_000, 30_000, 400_000, 14_000_000]) {
     const built = build({ meta: META, session: fileSessionOfSize(bytes) });
-    assert.ok(built.text.length <= PROMPT_BUDGET,
-      `${bytes}-byte session produced a ${built.text.length}-char prompt`);
-    assert.ok(built.text.length < 32_767, "the hard argv ceiling must never be reached");
+    assert.ok(
+      built.text.length <= PROMPT_BUDGET,
+      `${bytes}-byte session produced a ${built.text.length}-char prompt`,
+    );
+    assert.ok(
+      built.text.length < 32_767,
+      "the hard argv ceiling must never be reached",
+    );
   }
 });
 
@@ -961,23 +1091,38 @@ test("the boundary is decided on the assembled prompt, not on an estimate", () =
   for (let bytes = 20_000; bytes <= 32_000; bytes += 500) {
     const mode = build({ meta: META, session: fileSessionOfSize(bytes) }).mode;
     if (mode === "reference") seenReference = true;
-    else assert.equal(seenReference, false, `inline reappeared at ${bytes} bytes after reference`);
+    else
+      assert.equal(
+        seenReference,
+        false,
+        `inline reappeared at ${bytes} bytes after reference`,
+      );
   }
-  assert.equal(seenReference, true, "somewhere in that walk it must stop fitting");
+  assert.equal(
+    seenReference,
+    true,
+    "somewhere in that walk it must stop fitting",
+  );
 });
 
 test("an over-budget session that is not readable text yields no prompt at all", () => {
   const s = fileSessionOfSize(400_000);
   s.readable = false;
-  assert.equal(build({ meta: META, session: s }), null,
-    "the caller must report that complete context could not be retrieved");
+  assert.equal(
+    build({ meta: META, session: s }),
+    null,
+    "the caller must report that complete context could not be retrieved",
+  );
 });
 
 test("an unreadable session that fits inline is still fine: the bytes travel in the prompt", () => {
   const s = fileSessionOfSize(2000);
   s.readable = false;
-  assert.equal(build({ meta: META, session: s }).mode, "inline",
-    "readability only matters when the target has to open the file itself");
+  assert.equal(
+    build({ meta: META, session: s }).mode,
+    "inline",
+    "readability only matters when the target has to open the file itself",
+  );
 });
 ```
 
@@ -1003,7 +1148,11 @@ function build({ meta, session }) {
   if (!session.readable) return null;
   const text = renderReference({ meta, session });
   if (text.length > PROMPT_BUDGET) return null;
-  return { text, mode: "reference", markers: [SENTINEL, path.basename(session.nativePath)] };
+  return {
+    text,
+    mode: "reference",
+    markers: [SENTINEL, path.basename(session.nativePath)],
+  };
 }
 ```
 
@@ -1024,10 +1173,12 @@ git commit -m "feat: pick the handoff mode by measuring the assembled prompt"
 ### Task 8: `readScreen` returns raw text
 
 **Files:**
+
 - Modify: `lib/handoff.js:305` (`normalize`), `lib/handoff.js:356-368` (`readScreen`), and every site that matches against a screen
 - Test: `test/handoff.test.js`, `test/fixtures/fake-herdr-session.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `readScreen(call, paneId) -> string | null` returning the CLI's bytes **unchanged**, newlines intact. `flat(text) -> string` collapses whitespace and is applied at each matching site. Exported additionally: `flat`, `readScreenForTest: readScreen`.
 
@@ -1042,15 +1193,26 @@ const { readScreenForTest, flat } = require("../lib/handoff.js");
 
 test("readScreen hands back the screen with its lines intact", () => {
   const screen = "banner line\n\n  ─────❯      ─────\n? for shortcuts\n";
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "screen-")), "s.txt");
+  const file = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), "screen-")),
+    "s.txt",
+  );
   fs.writeFileSync(file, screen);
 
-  const env = { ...process.env, HANDOFF_FAKE_SCRIPT: SCRIPT, FAKE_SCREEN_FILE: file };
-  const call = (args, opts = {}) => require("../lib/herdr.js").run([SCRIPT, ...args], { env, ...opts });
+  const env = {
+    ...process.env,
+    HANDOFF_FAKE_SCRIPT: SCRIPT,
+    FAKE_SCREEN_FILE: file,
+  };
+  const call = (args, opts = {}) =>
+    require("../lib/herdr.js").run([SCRIPT, ...args], { env, ...opts });
 
   const got = readScreenForTest(call, "w1:p1");
   assert.equal(got, screen, "not one newline may be lost on the way in");
-  assert.ok(got.includes("\n"), "this is the guard: no newline means the line rules cannot fire");
+  assert.ok(
+    got.includes("\n"),
+    "this is the guard: no newline means the line rules cannot fire",
+  );
 });
 
 test("flat collapses whitespace for phrase matching without destroying the source", () => {
@@ -1088,7 +1250,7 @@ Add `flat` and `readScreenForTest: readScreen` to `module.exports`.
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `node --test test/handoff.test.js`
-Expected: PASS. Also run `node --test "test/**/*.test.js"`; `handoff.test.js` will still show failures from Task 4's removal of `snapshot.write`, which Task 10 fixes. No *new* failures may appear.
+Expected: PASS. Also run `node --test "test/**/*.test.js"`; `handoff.test.js` will still show failures from Task 4's removal of `snapshot.write`, which Task 10 fixes. No _new_ failures may appear.
 
 - [ ] **Step 5: Commit**
 
@@ -1102,17 +1264,20 @@ git commit -m "fix: stop flattening the target's screen before anything reads it
 ### Task 9: Line-shaped input-box detection
 
 **Files:**
+
 - Modify: `lib/handoff.js:421-460` (the marker block from `c6d1434`)
 - Create: `test/fixtures/screens/agy-verifying.txt`, `test/fixtures/screens/claude-idle.txt`, `test/fixtures/screens/grok-idle.txt`, `test/fixtures/screens/codex-trust.txt`
 - Test: `test/handoff.test.js`
 
 **Interfaces:**
+
 - Consumes: `flat` (Task 8).
 - Produces: `inputLineIndex(lines) -> number` (index into `lines`, or `-1`) and `startingUp(screen) -> boolean`, both exported. `PROMPT_MARKERS` and `textAfterLastPrompt` from `c6d1434` are removed.
 
 **Fixture contents.** Write these files with exactly these bytes — they are real captures, and a friendlier fixture is precisely the bug this task removes.
 
 `agy-verifying.txt`:
+
 ```
 ⚠️Verifying your account...
  └ We're finishing verifying your account eligibility.
@@ -1125,6 +1290,7 @@ git commit -m "fix: stop flattening the target's screen before anything reads it
 ```
 
 `claude-idle.txt`:
+
 ```
 
 
@@ -1135,11 +1301,13 @@ git commit -m "fix: stop flattening the target's screen before anything reads it
 ```
 
 `grok-idle.txt` — one single line, no newline anywhere, exactly as the CLI delivered it:
+
 ```
                              ≡ main ~\Claude Code                                  New worktree     ctrl+w    Resume session   ctrl+s    Changelog                  Quit             ctrl+q                               Grok 4.5 is here, try      it out for free for a…                                [Click here to Upgrade]                               Tip: Use Ctrl+O or         click [Click here to       Upgrade] to subscribe.                                ╭─────────────────────╮    │ >                   │    ╰─ Grok 4.5 (medium) ─╯                             Grok Build  0.2.112 [stab
 ```
 
 `codex-trust.txt`:
+
 ```
   directory allows
   project-local config,
@@ -1165,25 +1333,42 @@ const SCREENS = path.join(__dirname, "fixtures", "screens");
 // CLI never delivers, which is exactly how the previous rule looked tested.
 function screen(name) {
   const file = path.join(SCREENS, name);
-  const env = { ...process.env, HANDOFF_FAKE_SCRIPT: SCRIPT, FAKE_SCREEN_FILE: file };
-  const call = (args, opts = {}) => require("../lib/herdr.js").run([SCRIPT, ...args], { env, ...opts });
+  const env = {
+    ...process.env,
+    HANDOFF_FAKE_SCRIPT: SCRIPT,
+    FAKE_SCREEN_FILE: file,
+  };
+  const call = (args, opts = {}) =>
+    require("../lib/herdr.js").run([SCRIPT, ...args], { env, ...opts });
   return readScreenForTest(call, "w1:p1");
 }
 
 test("every screen fixture arrives with the bytes its file holds", () => {
-  for (const name of ["agy-verifying.txt", "claude-idle.txt", "grok-idle.txt", "codex-trust.txt"]) {
-    assert.equal(screen(name), fs.readFileSync(path.join(SCREENS, name), "utf8"),
-      `${name} was altered on the way in`);
+  for (const name of [
+    "agy-verifying.txt",
+    "claude-idle.txt",
+    "grok-idle.txt",
+    "codex-trust.txt",
+  ]) {
+    assert.equal(
+      screen(name),
+      fs.readFileSync(path.join(SCREENS, name), "utf8"),
+      `${name} was altered on the way in`,
+    );
   }
 });
 
 test("Antigravity's account banner above its input line is history, not current state", () => {
-  assert.equal(startingUp(screen("agy-verifying.txt")), false,
-    "the notice sits above a drawn input box; the agent is waiting for input");
+  assert.equal(
+    startingUp(screen("agy-verifying.txt")),
+    false,
+    "the notice sits above a drawn input box; the agent is waiting for input",
+  );
 });
 
 test("a notice with no input box anywhere is current state", () => {
-  const noBox = "⚠️Verifying your account...\n └ We're finishing verifying your account eligibility.\n";
+  const noBox =
+    "⚠️Verifying your account...\n └ We're finishing verifying your account eligibility.\n";
   const file = path.join(SCREENS, "tmp-nobox.txt");
   fs.writeFileSync(file, noBox);
   try {
@@ -1201,20 +1386,32 @@ test("Claude Code's prompt drawn inside a border line is found", () => {
 });
 
 test("Grok's box-drawn prompt is found when the capture has lines", () => {
-  assert.ok(inputLineIndex(["╭─────────╮", "│ >       │", "╰─ Grok ──╯"]) === 1);
+  assert.ok(
+    inputLineIndex(["╭─────────╮", "│ >       │", "╰─ Grok ──╯"]) === 1,
+  );
 });
 
 test("a capture with no newlines falls back to the character tail rather than guessing", () => {
   const raw = screen("grok-idle.txt");
-  assert.ok(!raw.includes("\n"), "this is what the CLI actually returns for Grok");
-  assert.equal(inputLineIndex(raw.split("\n")), -1, "one line: nothing to reason about");
+  assert.ok(
+    !raw.includes("\n"),
+    "this is what the CLI actually returns for Grok",
+  );
+  assert.equal(
+    inputLineIndex(raw.split("\n")),
+    -1,
+    "one line: nothing to reason about",
+  );
   assert.equal(startingUp(raw), false, "and its tail holds no startup phrase");
 });
 
 test("a startup notice below the input line still counts", () => {
   const lines = ["> ", "────────────", "Signing in to your account…"];
-  assert.equal(startingUp(lines.join("\n")), true,
-    "a footer notice is current state, unlike a banner above the box");
+  assert.equal(
+    startingUp(lines.join("\n")),
+    true,
+    "a footer notice is current state, unlike a banner above the box",
+  );
 });
 
 test("Codex's trust dialog is a question, and questions are never typed into", () => {
@@ -1225,11 +1422,21 @@ test("prose containing a quoted line is not mistaken for an input box", () => {
   const lines = [
     "> the previous agent wrote this in a markdown blockquote",
     "and then twelve more lines of ordinary output followed",
-    "line 3", "line 4", "line 5", "line 6", "line 7", "line 8", "line 9", "line 10",
+    "line 3",
+    "line 4",
+    "line 5",
+    "line 6",
+    "line 7",
+    "line 8",
+    "line 9",
+    "line 10",
     "Signing in to your account…",
   ];
-  assert.equal(startingUp(lines.join("\n")), true,
-    "the quote is far above the bottom and must not shield the notice");
+  assert.equal(
+    startingUp(lines.join("\n")),
+    true,
+    "the quote is far above the bottom and must not shield the notice",
+  );
 });
 ```
 
@@ -1256,7 +1463,8 @@ Replace the `c6d1434` block in `lib/handoff.js` with:
 const CURRENT_VIEW_CHARS = 400;
 const TAIL_LINES = 8;
 const PROMPT_GLYPHS = [">", "❯", "›", "▶", "»", "⏵", "$", "%", "#"];
-const BORDER = /^[\s\u2500-\u257f\u2580-\u259f\u2022\u00b7]+|[\s\u2500-\u257f\u2580-\u259f\u2022\u00b7]+$/g;
+const BORDER =
+  /^[\s\u2500-\u257f\u2580-\u259f\u2022\u00b7]+|[\s\u2500-\u257f\u2580-\u259f\u2022\u00b7]+$/g;
 
 const tailOf = (screen) =>
   typeof screen === "string" ? screen.slice(-CURRENT_VIEW_CHARS) : screen;
@@ -1303,11 +1511,13 @@ git commit -m "fix: tell a startup banner above the input box from live state be
 ### Task 10: Wire the orchestrator to prompt-only delivery
 
 **Files:**
+
 - Modify: `lib/handoff.js:766-792` (snapshot + `HANDOFF.md`), `lib/handoff.js:835-852` (delivery), `lib/handoff.js:884` (return)
 - Modify: `lib/paths.js` (drop `handoffsDir`)
 - Test: `test/handoff.test.js`, `test/paths.test.js`
 
 **Interfaces:**
+
 - Consumes: `snapshot.measure` (Task 4), `briefing.build` (Task 7).
 - Produces: `run()` returns `{ ok, message, prompt, mode, targetPaneId, agentName }` on success. `handoffDir` is gone from every return path. `dryRun` returns `{ ok: true, message: "", prompt, mode, request, meta }`.
 
@@ -1318,12 +1528,20 @@ In `test/handoff.test.js`, replace every assertion that reads `result.handoffDir
 ```js
 test("a handoff writes nothing to disk and carries the session in the prompt", async () => {
   const { env, home } = workspace({ agent: "pi", lines: 3 });
-  const result = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const result = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
 
   assert.equal(result.ok, true);
   assert.equal(result.mode, "inline");
   assert.match(result.prompt, /^You are taking over this session from/);
-  assert.equal(result.handoffDir, undefined, "there is no handoff directory any more");
+  assert.equal(
+    result.handoffDir,
+    undefined,
+    "there is no handoff directory any more",
+  );
 
   const state = path.join(home, "state");
   const stray = fs.existsSync(path.join(state, "handoffs"));
@@ -1332,15 +1550,27 @@ test("a handoff writes nothing to disk and carries the session in the prompt", a
 
 test("the prompt the target receives is the prompt that was built", async () => {
   const { env } = workspace({ agent: "pi", lines: 3 });
-  const result = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  const sent = readSentPrompts(env);   // whatever helper this file already uses to read
-  assert.equal(sent.length, 1, "exactly once");   // what the fake CLI recorded
+  const result = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
+  const sent = readSentPrompts(env); // whatever helper this file already uses to read
+  assert.equal(sent.length, 1, "exactly once"); // what the fake CLI recorded
   assert.equal(sent[0], result.prompt);
 });
 
 test("an over-budget unreadable source reports that full context is unavailable", async () => {
-  const { env } = workspace({ agent: "pi", binarySession: true, bytes: 400_000 });
-  const result = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const { env } = workspace({
+    agent: "pi",
+    binarySession: true,
+    bytes: 400_000,
+  });
+  const result = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(result.ok, false);
   assert.equal(result.message, MESSAGES.noContext);
 });
@@ -1358,40 +1588,48 @@ Expected: FAIL — `snapshot.write is not a function` from Task 4, and the new a
 In `lib/handoff.js`, replace step 5 and the `HANDOFF.md` write with:
 
 ```js
-  // 5. Measure the session, re-resolving so the capture is as fresh as possible.
-  //    Nothing is written: the transcript either travels inside the prompt or is
-  //    read by the target from where its own agent put it.
-  let session;
-  try {
-    resolved = resolveSource();
-    session = snapshot.measure({ resolved });
-  } catch (err) {
-    const message = err instanceof SqliteUnavailable && /node:sqlite/.test(err.message)
+// 5. Measure the session, re-resolving so the capture is as fresh as possible.
+//    Nothing is written: the transcript either travels inside the prompt or is
+//    read by the target from where its own agent put it.
+let session;
+try {
+  resolved = resolveSource();
+  session = snapshot.measure({ resolved });
+} catch (err) {
+  const message =
+    err instanceof SqliteUnavailable && /node:sqlite/.test(err.message)
       ? MESSAGES.needsNode225
       : MESSAGES.noContext;
-    notify(call, message);
-    return { ok: false, message };
-  }
+  notify(call, message);
+  return { ok: false, message };
+}
 
-  meta.snapshotUtc = new Date().toISOString();
-  const built = briefing.build({ meta, session });
-  if (!built) {
-    notify(call, MESSAGES.noContext);
-    return { ok: false, message: MESSAGES.noContext };
-  }
+meta.snapshotUtc = new Date().toISOString();
+const built = briefing.build({ meta, session });
+if (!built) {
+  notify(call, MESSAGES.noContext);
+  return { ok: false, message: MESSAGES.noContext };
+}
 
-  if (dryRun) {
-    return { ok: true, message: "", prompt: built.text, mode: built.mode, request, meta };
-  }
+if (dryRun) {
+  return {
+    ok: true,
+    message: "",
+    prompt: built.text,
+    mode: built.mode,
+    request,
+    meta,
+  };
+}
 ```
 
 Delete the `handoffsDir` mkdir, the `handoffPath` write, the `chmodSync`, and the `snapshot.prune` call. Change the delivery call to pass `built.text` and `built.markers`:
 
 ```js
-    await deliverPrompt(call, targetPaneId, built.text, env, built.markers, {
-      onSlow: () => notify(call, MESSAGES.startingUp(targetName)),
-      onAttention: () => notify(call, MESSAGES.needsAttention(targetName)),
-    });
+await deliverPrompt(call, targetPaneId, built.text, env, built.markers, {
+  onSlow: () => notify(call, MESSAGES.startingUp(targetName)),
+  onAttention: () => notify(call, MESSAGES.needsAttention(targetName)),
+});
 ```
 
 Replace `handoffDir: snap.dir` with `prompt: built.text, mode: built.mode` in the three remaining return statements, and drop `handoffsDir` from `lib/paths.js` and its export list.
@@ -1413,10 +1651,12 @@ git commit -m "feat: deliver the handoff as a prompt and write nothing to disk"
 ### Task 11: The one opencode exception
 
 **Files:**
+
 - Modify: `lib/handoff.js` (the `briefing.build` block from Task 10)
 - Test: `test/handoff.test.js`
 
 **Interfaces:**
+
 - Consumes: `exportPathFor` (Task 3), `briefing.build` (Task 7).
 - Produces: no new exports. When `session.strategy === "sqlite"` and `build` chose reference mode, the rows are written to `exportPathFor(dbPath, sessionId)` and the prompt is rebuilt with `nativePath` pointing there.
 
@@ -1426,33 +1666,63 @@ git commit -m "feat: deliver the handoff as a prompt and write nothing to disk"
 
 ```js
 test("a large opencode session is exported once, beside its own database", async () => {
-  const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 4000 });  // existing helper style
-  const result = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 4000 }); // existing helper style
+  const result = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
 
   assert.equal(result.ok, true);
   assert.equal(result.mode, "reference");
 
-  const exported = path.join(path.dirname(dbPath), `herdr-handoff-${sessionId}.jsonl`);
+  const exported = path.join(
+    path.dirname(dbPath),
+    `herdr-handoff-${sessionId}.jsonl`,
+  );
   assert.ok(fs.existsSync(exported), "the one documented exception");
   assert.ok(result.prompt.includes(exported), "and the prompt points at it");
-  assert.ok(!result.prompt.includes("opencode.db"), "never at the database itself");
+  assert.ok(
+    !result.prompt.includes("opencode.db"),
+    "never at the database itself",
+  );
 });
 
 test("handing off the same opencode session twice leaves one file, not two", async () => {
   const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 4000 });
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
 
   const dir = path.dirname(dbPath);
-  const ours = fs.readdirSync(dir).filter((f) => f.startsWith("herdr-handoff-"));
-  assert.deepEqual(ours, [`herdr-handoff-${sessionId}.jsonl`], "overwritten, never accumulated");
+  const ours = fs
+    .readdirSync(dir)
+    .filter((f) => f.startsWith("herdr-handoff-"));
+  assert.deepEqual(
+    ours,
+    [`herdr-handoff-${sessionId}.jsonl`],
+    "overwritten, never accumulated",
+  );
 });
 
 test("a small opencode session is inlined and writes nothing at all", async () => {
   const { env, dbPath } = opencodeWorkspace({ rows: 3 });
-  const result = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const result = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(result.mode, "inline");
-  const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
+  const ours = fs
+    .readdirSync(path.dirname(dbPath))
+    .filter((f) => f.startsWith("herdr-handoff-"));
   assert.deepEqual(ours, [], "under budget, opencode gets no exception either");
 });
 ```
@@ -1467,26 +1737,29 @@ Expected: FAIL — the export file does not exist and the prompt names `opencode
 In `lib/handoff.js`, after `built` is computed and before the `dryRun` return:
 
 ```js
-  // opencode's only store is a single database with no per-session files, so a
-  // session too large to inline has to be materialised. This is the one place the
-  // plugin writes anything. One file, named for the session, in opencode's own
-  // data directory, overwritten on each handoff of that session.
-  let delivered = built;
-  if (built.mode === "reference" && session.strategy === "sqlite") {
-    const exportPath = exportPathFor(resolved.dbPath, resolved.sessionId);
-    try {
-      fs.writeFileSync(exportPath, session.body);
-    } catch (err) {
-      log(`opencode export failed: ${describeError(err)}`);
-      notify(call, MESSAGES.noContext);
-      return { ok: false, message: MESSAGES.noContext };
-    }
-    delivered = briefing.build({ meta, session: { ...session, nativePath: exportPath } });
-    if (!delivered) {
-      notify(call, MESSAGES.noContext);
-      return { ok: false, message: MESSAGES.noContext };
-    }
+// opencode's only store is a single database with no per-session files, so a
+// session too large to inline has to be materialised. This is the one place the
+// plugin writes anything. One file, named for the session, in opencode's own
+// data directory, overwritten on each handoff of that session.
+let delivered = built;
+if (built.mode === "reference" && session.strategy === "sqlite") {
+  const exportPath = exportPathFor(resolved.dbPath, resolved.sessionId);
+  try {
+    fs.writeFileSync(exportPath, session.body);
+  } catch (err) {
+    log(`opencode export failed: ${describeError(err)}`);
+    notify(call, MESSAGES.noContext);
+    return { ok: false, message: MESSAGES.noContext };
   }
+  delivered = briefing.build({
+    meta,
+    session: { ...session, nativePath: exportPath },
+  });
+  if (!delivered) {
+    notify(call, MESSAGES.noContext);
+    return { ok: false, message: MESSAGES.noContext };
+  }
+}
 ```
 
 Use `delivered.text`, `delivered.mode` and `delivered.markers` from here on. Add `exportPathFor` to the `require` of `./source-sqlite.js` at `lib/handoff.js:16`.
@@ -1508,6 +1781,7 @@ git commit -m "feat: export a large opencode session beside its own database, on
 ### Task 12: README
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Update the documentation**
@@ -1538,6 +1812,7 @@ git commit -m "docs: describe the prompt-only handoff"
 ### Task 13: Live verification against the installed agents
 
 **Files:**
+
 - Create: `scratch/live-prompt-handoff.js` (throwaway, not committed)
 
 **This task cannot be completed by reasoning. It has to be run.** Seven agents are installed: `pi`, `claude`, `codex`, `grok`, `hermes`, `opencode`, `agy`.
@@ -1580,24 +1855,24 @@ Expected: every test passing. Commit any fix this task produced with a message n
 
 **Spec coverage:**
 
-| spec section | task |
-|---|---|
-| 2.1 prompt ceiling / budget | Global constraints, Task 7 |
-| 2.2 session sizes drive mode choice | Task 7 |
-| 2.3 opencode has no per-session file | Task 11 |
-| 3.1 anatomy, budget, sentinel marker | Tasks 5, 6, 7 |
-| 3.1 open risk: paste collapsing | Task 13 step 3 |
-| 3.2 inline mode | Task 5 |
-| 3.3 reference mode, pinned N, ranges | Tasks 1, 6 |
-| 3.3 readability gate | Tasks 2, 7 |
-| 4 opencode exception | Tasks 3, 11 |
-| 5.1 readScreen returns raw | Task 8 |
-| 5.3 line-shaped detection | Task 9 |
-| 5.4 safe for agents working today | Task 9 tests, Task 13 step 6 |
-| 6 module changes | Tasks 3, 4, 5, 6, 7, 10, 12 |
-| 7 errors | Tasks 7, 10, 11 |
-| 8 testing | every task; fixtures in Task 9 |
-| 9 limitations | Task 12 (README) |
+| spec section                         | task                           |
+| ------------------------------------ | ------------------------------ |
+| 2.1 prompt ceiling / budget          | Global constraints, Task 7     |
+| 2.2 session sizes drive mode choice  | Task 7                         |
+| 2.3 opencode has no per-session file | Task 11                        |
+| 3.1 anatomy, budget, sentinel marker | Tasks 5, 6, 7                  |
+| 3.1 open risk: paste collapsing      | Task 13 step 3                 |
+| 3.2 inline mode                      | Task 5                         |
+| 3.3 reference mode, pinned N, ranges | Tasks 1, 6                     |
+| 3.3 readability gate                 | Tasks 2, 7                     |
+| 4 opencode exception                 | Tasks 3, 11                    |
+| 5.1 readScreen returns raw           | Task 8                         |
+| 5.3 line-shaped detection            | Task 9                         |
+| 5.4 safe for agents working today    | Task 9 tests, Task 13 step 6   |
+| 6 module changes                     | Tasks 3, 4, 5, 6, 7, 10, 12    |
+| 7 errors                             | Tasks 7, 10, 11                |
+| 8 testing                            | every task; fixtures in Task 9 |
+| 9 limitations                        | Task 12 (README)               |
 
 **Placeholder scan:** none. Every code step carries the code; every test step carries the assertions. Task 12 is prose-only by nature and lists the exact claims to make. Task 13 is a live procedure with recorded outcomes and one explicit decision point.
 

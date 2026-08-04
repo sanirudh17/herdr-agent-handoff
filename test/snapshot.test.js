@@ -6,7 +6,11 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { measure, isReadableText, READABLE_PROBE_BYTES } = require("../lib/snapshot.js");
+const {
+  measure,
+  isReadableText,
+  READABLE_PROBE_BYTES,
+} = require("../lib/snapshot.js");
 
 test("line-oriented UTF-8 text is readable", () => {
   const body = Buffer.from('{"a":1}\n{"a":2}\n', "utf8");
@@ -14,7 +18,11 @@ test("line-oriented UTF-8 text is readable", () => {
 });
 
 test("a NUL byte means it is not text a target can read", () => {
-  const body = Buffer.concat([Buffer.from('{"a":1}\n'), Buffer.from([0x00]), Buffer.from("more\n")]);
+  const body = Buffer.concat([
+    Buffer.from('{"a":1}\n'),
+    Buffer.from([0x00]),
+    Buffer.from("more\n"),
+  ]);
   assert.equal(isReadableText(body), false);
 });
 
@@ -25,7 +33,10 @@ test("invalid UTF-8 is not readable", () => {
 });
 
 test("text with no newline at all is not line-oriented", () => {
-  assert.equal(isReadableText(Buffer.from("one single line, no terminator", "utf8")), false);
+  assert.equal(
+    isReadableText(Buffer.from("one single line, no terminator", "utf8")),
+    false,
+  );
 });
 
 test("a literal replacement character does not make real text unreadable", () => {
@@ -71,16 +82,26 @@ test("a file session is measured, hashed and left exactly where it is", () => {
   assert.equal(m.nativePath, file);
   assert.equal(m.bytes, Buffer.byteLength(contents));
   assert.equal(m.lines, 3);
-  assert.equal(m.sha256, crypto.createHash("sha256").update(contents).digest("hex"));
+  assert.equal(
+    m.sha256,
+    crypto.createHash("sha256").update(contents).digest("hex"),
+  );
   assert.equal(m.readable, true);
   assert.equal(m.counts, null);
-  assert.equal(m.body.toString("utf8"), contents, "the body is the file byte for byte");
+  assert.equal(
+    m.body.toString("utf8"),
+    contents,
+    "the body is the file byte for byte",
+  );
   assert.deepEqual(fs.readdirSync(dir), before, "measuring writes nothing");
 });
 
 test("a final line without a trailing newline still counts", () => {
   const { file } = tempFile('{"n":1}\n{"n":2}');
-  assert.equal(measure({ resolved: { strategy: "file", path: file } }).lines, 2);
+  assert.equal(
+    measure({ resolved: { strategy: "file", path: file } }).lines,
+    2,
+  );
 });
 
 test("an unreadable native file is measured but flagged, not thrown on", () => {
@@ -92,6 +113,10 @@ test("an unreadable native file is measured but flagged, not thrown on", () => {
 test("measure no longer offers the copying API", () => {
   const snapshot = require("../lib/snapshot.js");
   for (const gone of ["write", "prune", "chunk"]) {
-    assert.equal(snapshot[gone], undefined, `${gone} should be gone: nothing is copied any more`);
+    assert.equal(
+      snapshot[gone],
+      undefined,
+      `${gone} should be gone: nothing is copied any more`,
+    );
   }
 });

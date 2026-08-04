@@ -4,8 +4,16 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
-  run, MESSAGES, shellIsAtPrompt, startingUp, needsAnswer, usable,
-  readScreenForTest, flat, inputLineIndex, timings,
+  run,
+  MESSAGES,
+  shellIsAtPrompt,
+  startingUp,
+  needsAnswer,
+  usable,
+  readScreenForTest,
+  flat,
+  inputLineIndex,
+  timings,
 } = require("../lib/handoff.js");
 const herdr = require("../lib/herdr.js");
 const briefing = require("../lib/briefing.js");
@@ -13,7 +21,11 @@ const briefing = require("../lib/briefing.js");
 const ID = "ae39a48c-52dd-48e6-a3cf-262b2ccb0f5f";
 const SCRIPT = path.join(__dirname, "fixtures", "fake-herdr-session.js");
 
-function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines = 3 } = {}) {
+function workspace({
+  agent = "pi",
+  sessionRef = { kind: "id", value: ID },
+  lines = 3,
+} = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-run-"));
   const state = path.join(home, "state");
   const bin = path.join(home, "bin");
@@ -22,8 +34,17 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     fs.writeFileSync(path.join(bin, name), "#!/bin/sh\n", { mode: 0o755 });
   }
 
-  const body = Array.from({ length: lines }, (_, i) => JSON.stringify({ i })).join("\n") + "\n";
-  const file = path.join(home, ".pi", "agent", "sessions", "p", `2026-07-24T00-00-00-000Z_${ID}.jsonl`);
+  const body =
+    Array.from({ length: lines }, (_, i) => JSON.stringify({ i })).join("\n") +
+    "\n";
+  const file = path.join(
+    home,
+    ".pi",
+    "agent",
+    "sessions",
+    "p",
+    `2026-07-24T00-00-00-000Z_${ID}.jsonl`,
+  );
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, body);
 
@@ -50,9 +71,13 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
     // By default the fake agent reacts to a prompt, as a healthy one would.
     HANDOFF_FAKE_GET_COUNT: path.join(home, "agent-get-count.txt"),
     HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
-      focused_pane_id: "w5:p1", workspace_id: "w5", tab_id: "w5:t1",
-      workspace_label: "Herdr", tab_label: "1",
-      focused_pane_agent: agent, focused_pane_cwd: home,
+      focused_pane_id: "w5:p1",
+      workspace_id: "w5",
+      tab_id: "w5:t1",
+      workspace_label: "Herdr",
+      tab_label: "1",
+      focused_pane_agent: agent,
+      focused_pane_cwd: home,
     }),
     HANDOFF_TEST_HOME: home,
   };
@@ -81,11 +106,27 @@ function opencodeWorkspace({ rows = 3, pad = 200, reference } = {}) {
     CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT,
       time_created INTEGER, time_updated INTEGER, data TEXT);
   `);
-  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?,?)")
-    .run(OC_SID, "proj", "/w", "Fix the parser", "build", "opus", 1, 2, null, null);
+  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?,?)").run(
+    OC_SID,
+    "proj",
+    "/w",
+    "Fix the parser",
+    "build",
+    "opus",
+    1,
+    2,
+    null,
+    null,
+  );
   const insert = db.prepare("INSERT INTO message VALUES (?,?,?,?,?)");
   for (let i = 0; i < rows; i += 1) {
-    insert.run(`m${i}`, OC_SID, i, i, JSON.stringify({ role: "user", text: "x".repeat(pad) }));
+    insert.run(
+      `m${i}`,
+      OC_SID,
+      i,
+      i,
+      JSON.stringify({ role: "user", text: "x".repeat(pad) }),
+    );
   }
   db.close();
 
@@ -94,7 +135,11 @@ function opencodeWorkspace({ rows = 3, pad = 200, reference } = {}) {
 
 function readCalls(file) {
   if (!fs.existsSync(file)) return [];
-  return fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  return fs
+    .readFileSync(file, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
 }
 
 test("dry run resolves and snapshots without creating panes", async () => {
@@ -102,10 +147,22 @@ test("dry run resolves and snapshots without creating panes", async () => {
   const out = await run({ destination: "tab", env, dryRun: true });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("pane get")), "should read the source pane");
-  assert.ok(!argv.some((a) => a.startsWith("pane split")), "must not split in dry run");
-  assert.ok(!argv.some((a) => a.startsWith("tab create")), "must not create a tab in dry run");
-  assert.ok(!argv.some((a) => a.startsWith("agent start")), "must not start an agent in dry run");
+  assert.ok(
+    argv.some((a) => a.startsWith("pane get")),
+    "should read the source pane",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("pane split")),
+    "must not split in dry run",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("tab create")),
+    "must not create a tab in dry run",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("agent start")),
+    "must not start an agent in dry run",
+  );
 });
 
 test("a dry run builds the whole handoff into the prompt and writes nothing", async () => {
@@ -114,11 +171,21 @@ test("a dry run builds the whole handoff into the prompt and writes nothing", as
 
   assert.equal(out.mode, "inline", "five lines fit inside the prompt");
   assert.match(out.prompt, /^You are taking over this session from/);
-  assert.equal(out.handoffDir, undefined, "there is no handoff directory any more");
+  assert.equal(
+    out.handoffDir,
+    undefined,
+    "there is no handoff directory any more",
+  );
 
   const transcript = fs.readFileSync(file, "utf8");
-  assert.ok(out.prompt.includes(transcript), "the session travels verbatim inside the prompt");
-  assert.ok(!fs.existsSync(path.join(home, "state", "handoffs")), "no handoffs directory");
+  assert.ok(
+    out.prompt.includes(transcript),
+    "the session travels verbatim inside the prompt",
+  );
+  assert.ok(
+    !fs.existsSync(path.join(home, "state", "handoffs")),
+    "no handoffs directory",
+  );
 });
 
 test("a session too large to inline becomes a reference to the agent's own file", async () => {
@@ -126,9 +193,15 @@ test("a session too large to inline becomes a reference to the agent's own file"
   const out = await run({ destination: "split", env, dryRun: true });
 
   assert.equal(out.mode, "reference");
-  assert.ok(out.prompt.includes(file), "the prompt names the source agent's own transcript");
+  assert.ok(
+    out.prompt.includes(file),
+    "the prompt names the source agent's own transcript",
+  );
   assert.ok(out.prompt.length < 32_767, "and still fits the command line");
-  assert.ok(!fs.existsSync(path.join(home, "state", "handoffs")), "still nothing written");
+  assert.ok(
+    !fs.existsSync(path.join(home, "state", "handoffs")),
+    "still nothing written",
+  );
 });
 
 test("an over-budget source that is not readable text reports no full context", async () => {
@@ -138,10 +211,22 @@ test("an over-budget source that is not readable text reports no full context", 
   const body = fs.readFileSync(file);
   fs.writeFileSync(file, Buffer.concat([Buffer.from([0x00]), body]));
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.noContext("the session is too large to inline and not readable as text"));
-  assert.equal(out.detail, "the session is too large to inline and not readable as text");
+  assert.equal(
+    out.message,
+    MESSAGES.noContext(
+      "the session is too large to inline and not readable as text",
+    ),
+  );
+  assert.equal(
+    out.detail,
+    "the session is too large to inline and not readable as text",
+  );
 });
 
 test("a pane with no agent fails before opening the picker", async () => {
@@ -150,32 +235,59 @@ test("a pane with no agent fails before opening the picker", async () => {
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.notAgentPane);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(!argv.some((a) => a.startsWith("plugin pane open")), "picker must not open");
+  assert.ok(
+    !argv.some((a) => a.startsWith("plugin pane open")),
+    "picker must not open",
+  );
 });
 
 test("an unresolvable source still opens the picker; the refusal names the reason", async () => {
   const { env, calls } = workspace({ agent: "claude" });
-  const out = await run({ destination: "tab", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.noContext("claude session store directory not found"));
+  assert.equal(
+    out.message,
+    MESSAGES.noContext("claude session store directory not found"),
+  );
   assert.equal(out.detail, "claude session store directory not found");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(!argv.some((a) => a.startsWith("tab create")), "nothing may be created");
+  assert.ok(
+    !argv.some((a) => a.startsWith("tab create")),
+    "nothing may be created",
+  );
 });
 
 test("the picker opens even when the source context cannot be resolved yet", async () => {
   const { env, calls } = workspace({ agent: "claude" });
   const out = await run({ destination: "tab", env, pickerTimeoutMs: 150 });
-  assert.equal(out.cancelled, true, "an unanswered picker times out as a cancel");
+  assert.equal(
+    out.cancelled,
+    true,
+    "an unanswered picker times out as a cancel",
+  );
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("plugin pane open")), "the picker must open");
+  assert.ok(
+    argv.some((a) => a.startsWith("plugin pane open")),
+    "the picker must open",
+  );
 });
 
 test("a non-integrated source kind refuses with the reason after the choice", async () => {
-  const { env, calls } = workspace({ agent: "agy", sessionRef: null });
-  const out = await run({ destination: "tab", env, pickerChoice: { selected: "claude" } });
+  const { env } = workspace({ agent: "agy", sessionRef: null });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.noContext("Herdr reported no session reference for agy"));
+  assert.equal(
+    out.message,
+    MESSAGES.noContext("Herdr reported no session reference for agy"),
+  );
 });
 
 // cline persists its session only after the first exchange (its core writes the
@@ -187,24 +299,45 @@ function clineSession(home, sid = "1785820760831_zksgo") {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const { DatabaseSync } = require("node:sqlite");
   const db = new DatabaseSync(dbPath);
-  db.exec("CREATE TABLE sessions (session_id TEXT, started_at TEXT, ended_at TEXT, cwd TEXT, workspace_root TEXT)");
-  db.prepare("INSERT INTO sessions VALUES (?,?,?,?,?)").run(sid, new Date().toISOString(), null, home, home);
+  db.exec(
+    "CREATE TABLE sessions (session_id TEXT, started_at TEXT, ended_at TEXT, cwd TEXT, workspace_root TEXT)",
+  );
+  db.prepare("INSERT INTO sessions VALUES (?,?,?,?,?)").run(
+    sid,
+    new Date().toISOString(),
+    null,
+    home,
+    home,
+  );
   db.close();
   const file = path.join(data, "sessions", sid, `${sid}.messages.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify([{ role: "user", content: "fix it" }]) + "\n");
+  fs.writeFileSync(
+    file,
+    JSON.stringify([{ role: "user", content: "fix it" }]) + "\n",
+  );
   return file;
 }
 
 test("cline with a persisted session hands off end to end", async () => {
   const { env, home, calls } = workspace({ agent: "cline", sessionRef: null });
   const file = clineSession(home);
-  const out = await run({ destination: "tab", env, pickerChoice: { selected: "pi" } });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { selected: "pi" },
+  });
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: Cline → pi (new tab)");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("tab create")), "the target is created");
-  assert.ok(fs.existsSync(file), "the transcript is read in place, never moved");
+  assert.ok(
+    argv.some((a) => a.startsWith("tab create")),
+    "the target is created",
+  );
+  assert.ok(
+    fs.existsSync(file),
+    "the transcript is read in place, never moved",
+  );
 });
 
 test("cline without a persisted transcript waits, then hands off after the first exchange", async () => {
@@ -215,7 +348,11 @@ test("cline without a persisted transcript waits, then hands off after the first
   try {
     const out = await run({
       destination: "tab",
-      env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "40", HANDOFF_RESOLVE_RETRIES: "50" },
+      env: {
+        ...env,
+        HANDOFF_RESOLVE_RETRY_MS: "40",
+        HANDOFF_RESOLVE_RETRIES: "50",
+      },
       pickerChoice: { selected: "pi" },
     });
     assert.equal(out.ok, true);
@@ -228,11 +365,18 @@ test("cline with nothing persisted refuses and names why", async () => {
   const { env } = workspace({ agent: "cline", sessionRef: null });
   const out = await run({
     destination: "tab",
-    env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "20", HANDOFF_RESOLVE_RETRIES: "2" },
+    env: {
+      ...env,
+      HANDOFF_RESOLVE_RETRY_MS: "20",
+      HANDOFF_RESOLVE_RETRIES: "2",
+    },
     pickerChoice: { selected: "pi" },
   });
   assert.equal(out.ok, false);
-  assert.match(out.message, /cline has no persisted session for .* yet; cline writes its transcript after the first exchange/);
+  assert.match(
+    out.message,
+    /cline has no persisted session for .* yet; cline writes its transcript after the first exchange/,
+  );
 });
 
 test("a session file that appears late is waited out (lazy persistence)", async () => {
@@ -246,7 +390,11 @@ test("a session file that appears late is waited out (lazy persistence)", async 
   try {
     const out = await run({
       destination: "tab",
-      env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "40", HANDOFF_RESOLVE_RETRIES: "50" },
+      env: {
+        ...env,
+        HANDOFF_RESOLVE_RETRY_MS: "40",
+        HANDOFF_RESOLVE_RETRIES: "50",
+      },
       dryRun: true,
     });
     assert.equal(out.ok, true);
@@ -261,7 +409,11 @@ test("a session file that never appears fails after a bounded wait", async () =>
   const start = Date.now();
   const out = await run({
     destination: "tab",
-    env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "20", HANDOFF_RESOLVE_RETRIES: "5" },
+    env: {
+      ...env,
+      HANDOFF_RESOLVE_RETRY_MS: "20",
+      HANDOFF_RESOLVE_RETRIES: "5",
+    },
     pickerChoice: { selected: "claude" },
   });
   assert.equal(out.ok, false);
@@ -271,7 +423,11 @@ test("a session file that never appears fails after a bounded wait", async () =>
 
 test("cancelling the picker leaves nothing created and reports nothing", async () => {
   const { env, calls } = workspace();
-  const out = await run({ destination: "tab", env, pickerChoice: { cancelled: true } });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { cancelled: true },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.cancelled, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
@@ -282,93 +438,172 @@ test("cancelling the picker leaves nothing created and reports nothing", async (
 test("split handoff splits beside the source, starts, prompts, focuses and notifies", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "native"; // pin the launch strategy; order is what matters here
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: pi → Claude Code (split)");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  const order = ["pane split", "pane run", "agent prompt", "agent focus", "notification show"];
+  const order = [
+    "pane split",
+    "pane run",
+    "agent prompt",
+    "agent focus",
+    "notification show",
+  ];
   let cursor = -1;
   for (const step of order) {
     const at = argv.findIndex((a, i) => i > cursor && a.startsWith(step));
-    assert.ok(at > cursor, `${step} must run after the previous step; got ${JSON.stringify(argv)}`);
+    assert.ok(
+      at > cursor,
+      `${step} must run after the previous step; got ${JSON.stringify(argv)}`,
+    );
     cursor = at;
   }
-  assert.ok(argv.some((a) => a.startsWith("pane split") && a.includes("--pane w5:p1")));
-  assert.ok(argv.some((a) => a.startsWith("pane split") && a.includes("--direction right")));
-  assert.ok(argv.some((a) => a.startsWith("pane split") && a.includes("--no-focus")));
+  assert.ok(
+    argv.some((a) => a.startsWith("pane split") && a.includes("--pane w5:p1")),
+  );
+  assert.ok(
+    argv.some(
+      (a) => a.startsWith("pane split") && a.includes("--direction right"),
+    ),
+  );
+  assert.ok(
+    argv.some((a) => a.startsWith("pane split") && a.includes("--no-focus")),
+  );
 });
 
 test("tab handoff creates a tab in the source workspace and resolves its pane", async () => {
   const { env, calls } = workspace();
-  const out = await run({ destination: "tab", env, pickerChoice: { selected: "codex" } });
+  const out = await run({
+    destination: "tab",
+    env,
+    pickerChoice: { selected: "codex" },
+  });
   assert.equal(out.ok, true);
   assert.equal(out.message, "Handoff started: pi → Codex (new tab)");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("tab create") && a.includes("--workspace w5")));
-  assert.ok(argv.some((a) => a.startsWith("pane list")), "must resolve the new tab's pane");
+  assert.ok(
+    argv.some(
+      (a) => a.startsWith("tab create") && a.includes("--workspace w5"),
+    ),
+  );
+  assert.ok(
+    argv.some((a) => a.startsWith("pane list")),
+    "must resolve the new tab's pane",
+  );
 });
 
 test("the source pane is only ever read", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   for (const call of readCalls(calls)) {
     const text = call.join(" ");
     // Check the pane the command *addresses*, not the text it carries. The prompt
     // body names the source pane in its identity table and its boundary rule, and a
     // substring scan cannot tell that from writing to it.
-    const addressed = call[0] === "agent" && call[1] === "prompt" ? call.slice(0, 3) : call;
+    const addressed =
+      call[0] === "agent" && call[1] === "prompt" ? call.slice(0, 3) : call;
     const touchesSource = addressed.some((arg) => arg === "w5:p1");
     const isRead =
-      text.startsWith("pane get") || text.startsWith("pane split") || text.startsWith("pane list");
-    assert.ok(!touchesSource || isRead, `unexpected write to the source pane: ${text}`);
-    assert.ok(!text.startsWith("pane send-text"), "must never send text to a pane");
-    assert.ok(!text.startsWith("pane send-keys"), "must never send keys to a pane");
+      text.startsWith("pane get") ||
+      text.startsWith("pane split") ||
+      text.startsWith("pane list");
+    assert.ok(
+      !touchesSource || isRead,
+      `unexpected write to the source pane: ${text}`,
+    );
+    assert.ok(
+      !text.startsWith("pane send-text"),
+      "must never send text to a pane",
+    );
+    assert.ok(
+      !text.startsWith("pane send-keys"),
+      "must never send keys to a pane",
+    );
     assert.ok(!text.startsWith("pane close"), "must never close a pane");
     assert.ok(!text.startsWith("pane read"), "must never read scrollback");
     assert.ok(
       !(text.startsWith("pane run") && text.includes("w5:p1")),
-      "must never run a command in the source pane"
+      "must never run a command in the source pane",
     );
   }
 });
 
 test("the prompt the target receives is exactly the prompt that was built", async () => {
   const { env, calls } = workspace();
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
   assert.equal(prompts.length, 1, "submitted exactly once");
-  assert.equal(prompts[0][3], out.prompt, "nothing is added or trimmed on the way out");
+  assert.equal(
+    prompts[0][3],
+    out.prompt,
+    "nothing is added or trimmed on the way out",
+  );
   assert.match(out.prompt, /^You are taking over this session from \*\*pi\*\*/);
-  assert.ok(!out.prompt.includes("HANDOFF.md"), "there is no document to point at");
+  assert.ok(
+    !out.prompt.includes("HANDOFF.md"),
+    "there is no document to point at",
+  );
 });
 
 test("a failed target creation reports and creates no agent", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_FAIL = "pane split";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.targetCreateFailed("split"));
-  assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "start"));
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "start"),
+  );
 });
 
 test("a failed native agent start reports and does not prompt", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "native";
   env.HANDOFF_FAKE_FAIL = "agent start";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "pi" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "pi" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.startFailed("pi"));
-  assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"));
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"),
+  );
 });
 
 test("a failed pane-shell launch reports and does not prompt", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "pane-run";
   env.HANDOFF_FAKE_FAIL = "pane run";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.startFailed("Claude Code"));
-  assert.ok(!readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"));
+  assert.ok(
+    !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "prompt"),
+  );
 });
 
 test("a failed prompt reports the prompt failure", async () => {
@@ -377,25 +612,39 @@ test("a failed prompt reports the prompt failure", async () => {
   // Neither proof of delivery: nothing on screen, and the agent never stirs.
   env.HANDOFF_FAKE_REACTS = "never";
   env.HANDOFF_FAKE_NO_SEQ = "1";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
 });
 
 test("delivery is proven by the prompt appearing in the target, not by the submit call", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   const argv = readCalls(calls).map((c) => c.join(" "));
   assert.ok(
     argv.some((a) => a.startsWith("agent read w5:p2")),
-    "the target's own screen is the proof of delivery"
+    "the target's own screen is the proof of delivery",
   );
 });
 
 test("a confirmed prompt is submitted only once", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
   assert.equal(prompts.length, 1, "confirmation stops the loop immediately");
 });
 
@@ -405,8 +654,12 @@ test("a redraw alone is never accepted as delivery", async () => {
   // from a reply. Accepting it announced a handoff that had not been delivered —
   // the worst outcome available here.
   const { env } = workspace();
-  env.HANDOFF_FAKE_REACTS = "never";  // never echoes the prompt
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  env.HANDOFF_FAKE_REACTS = "never"; // never echoes the prompt
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
   assert.equal(out.ok, false, "a screen that merely changed proves nothing");
   assert.equal(out.message, MESSAGES.promptFailed("Antigravity CLI"));
 });
@@ -415,7 +668,11 @@ test("a state change alone is never accepted as delivery", async () => {
   const { env, home } = workspace();
   env.HANDOFF_FAKE_REACTS = "never";
   env.HANDOFF_FAKE_GET_COUNT = path.join(home, "seq.txt"); // state moves on its own
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "opencode" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "opencode" },
+  });
   assert.equal(out.ok, false, "a settling agent changes state by itself");
 });
 
@@ -425,8 +682,16 @@ test("a prompt echoed and then discarded is not a delivery", async () => {
   // six seconds later, replaced by "Verifying your account…".
   const { env } = workspace();
   env.HANDOFF_FAKE_ECHO_THEN_DROP = "1";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
-  assert.equal(out.ok, false, "an echo that does not survive is not acceptance");
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
+  assert.equal(
+    out.ok,
+    false,
+    "an echo that does not survive is not acceptance",
+  );
   // Reported as not-yet-ready rather than as a question: the account check is why
   // it dropped the prompt, and nothing was asked of the user.
   assert.equal(out.notReady, true);
@@ -435,8 +700,16 @@ test("a prompt echoed and then discarded is not a delivery", async () => {
 
 test("delivery is confirmed only by the prompt appearing", async () => {
   const { env } = workspace();
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  assert.equal(out.ok, true, "the fake echoes the prompt, which is the one accepted proof");
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
+  assert.equal(
+    out.ok,
+    true,
+    "the fake echoes the prompt, which is the one accepted proof",
+  );
 });
 
 test("the handoff is never sent more than once", async () => {
@@ -447,18 +720,39 @@ test("the handoff is never sent more than once", async () => {
   env.HANDOFF_FAKE_REACTS = "never";
   env.HANDOFF_FAKE_FROZEN = "1";
   env.HANDOFF_FAKE_NO_SEQ = "1";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
-  assert.equal(out.ok, false, "unconfirmed delivery is never reported as success");
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 1, "one submission, so the task cannot be handed over twice");
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
+  assert.equal(
+    out.ok,
+    false,
+    "unconfirmed delivery is never reported as success",
+  );
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(
+    prompts.length,
+    1,
+    "one submission, so the task cannot be handed over twice",
+  );
 });
 
 test("readiness is judged from the target's screen, not its reported state", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   const argv = readCalls(calls).map((c) => c.join(" "));
   const reads = argv.filter((a) => a.startsWith("agent read w5:p2"));
-  assert.ok(reads.length > 0, "the target's screen is what gates the submission");
+  assert.ok(
+    reads.length > 0,
+    "the target's screen is what gates the submission",
+  );
 });
 
 test("a busy target is waited for, then still handed off", async () => {
@@ -469,9 +763,15 @@ test("a busy target is waited for, then still handed off", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_STATUS = "working";
   env.HANDOFF_READY_CAP_MS = "600";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
   assert.equal(out.ok, true);
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
   assert.equal(prompts.length, 1, "busy is a reason to wait, not to give up");
 });
 
@@ -487,18 +787,25 @@ function screenFrom(file) {
     HANDOFF_FAKE_SCRIPT: SCRIPT,
     FAKE_SCREEN_FILE: file,
   };
-  const call = (args, opts = {}) => herdr.run([SCRIPT, ...args], { env, ...opts });
+  const call = (args, opts = {}) =>
+    herdr.run([SCRIPT, ...args], { env, ...opts });
   return readScreenForTest(call, "w1:p1");
 }
 
 test("readScreen hands back the screen with its lines intact", () => {
   const screen = "banner line\n\n  ─────❯      ─────\n? for shortcuts\n";
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "screen-")), "s.txt");
+  const file = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), "screen-")),
+    "s.txt",
+  );
   fs.writeFileSync(file, screen);
 
   const got = screenFrom(file);
   assert.equal(got, screen, "not one newline may be lost on the way in");
-  assert.ok(got.includes("\n"), "this is the guard: no newline means the line rules cannot fire");
+  assert.ok(
+    got.includes("\n"),
+    "this is the guard: no newline means the line rules cannot fire",
+  );
 });
 
 test("flat collapses whitespace for phrase matching without destroying the source", () => {
@@ -514,21 +821,37 @@ const SCREENS = path.join(__dirname, "fixtures", "screens");
 const screen = (name) => screenFrom(path.join(SCREENS, name));
 
 test("every screen fixture arrives with the bytes its file holds", () => {
-  for (const name of ["agy-verifying.txt", "claude-idle.txt", "grok-idle.txt", "codex-trust.txt"]) {
-    assert.equal(screen(name), fs.readFileSync(path.join(SCREENS, name), "utf8"),
-      `${name} was altered on the way in`);
+  for (const name of [
+    "agy-verifying.txt",
+    "claude-idle.txt",
+    "grok-idle.txt",
+    "codex-trust.txt",
+  ]) {
+    assert.equal(
+      screen(name),
+      fs.readFileSync(path.join(SCREENS, name), "utf8"),
+      `${name} was altered on the way in`,
+    );
   }
 });
 
 test("Antigravity's account banner above its input line is history, not current state", () => {
-  assert.equal(startingUp(screen("agy-verifying.txt")), false,
-    "the notice sits above a drawn input box; the agent is waiting for input");
+  assert.equal(
+    startingUp(screen("agy-verifying.txt")),
+    false,
+    "the notice sits above a drawn input box; the agent is waiting for input",
+  );
 });
 
 test("the same notice with no input box anywhere is current state", () => {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "nobox-")), "s.txt");
-  fs.writeFileSync(file,
-    "⚠️Verifying your account...\n └ We're finishing verifying your account eligibility.\n");
+  const file = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), "nobox-")),
+    "s.txt",
+  );
+  fs.writeFileSync(
+    file,
+    "⚠️Verifying your account...\n └ We're finishing verifying your account eligibility.\n",
+  );
   assert.equal(startingUp(screenFrom(file)), true);
 });
 
@@ -540,20 +863,33 @@ test("Claude Code's prompt drawn inside a border line is found", () => {
 });
 
 test("Grok's box-drawn prompt is found when the capture has lines", () => {
-  assert.equal(inputLineIndex(["╭─────────╮", "│ >       │", "╰─ Grok ──╯"]), 1);
+  assert.equal(
+    inputLineIndex(["╭─────────╮", "│ >       │", "╰─ Grok ──╯"]),
+    1,
+  );
 });
 
 test("a capture with no newlines falls back to the character tail rather than guessing", () => {
   const raw = screen("grok-idle.txt");
-  assert.ok(!raw.includes("\n"), "this is what the CLI actually returns for Grok");
-  assert.equal(inputLineIndex(raw.split("\n")), -1, "one line: nothing to reason about");
+  assert.ok(
+    !raw.includes("\n"),
+    "this is what the CLI actually returns for Grok",
+  );
+  assert.equal(
+    inputLineIndex(raw.split("\n")),
+    -1,
+    "one line: nothing to reason about",
+  );
   assert.equal(startingUp(raw), false, "and its tail holds no startup phrase");
 });
 
 test("a startup notice below the input line still counts", () => {
   const lines = ["> ", "────────────", "Signing in to your account…"];
-  assert.equal(startingUp(lines.join("\n")), true,
-    "a footer notice is current state, unlike a banner above the box");
+  assert.equal(
+    startingUp(lines.join("\n")),
+    true,
+    "a footer notice is current state, unlike a banner above the box",
+  );
 });
 
 test("Codex's trust dialog is a question, and questions are never typed into", () => {
@@ -564,11 +900,21 @@ test("prose containing a quoted line is not mistaken for an input box", () => {
   const lines = [
     "> the previous agent wrote this in a markdown blockquote",
     "and then twelve more lines of ordinary output followed",
-    "line 3", "line 4", "line 5", "line 6", "line 7", "line 8", "line 9", "line 10",
+    "line 3",
+    "line 4",
+    "line 5",
+    "line 6",
+    "line 7",
+    "line 8",
+    "line 9",
+    "line 10",
     "Signing in to your account…",
   ];
-  assert.equal(startingUp(lines.join("\n")), true,
-    "the quote is far above the bottom and must not shield the notice");
+  assert.equal(
+    startingUp(lines.join("\n")),
+    true,
+    "the quote is far above the bottom and must not shield the notice",
+  );
 });
 
 test("closing the target mid-confirmation is not reported as a failure", async () => {
@@ -579,22 +925,37 @@ test("closing the target mid-confirmation is not reported as a failure", async (
   env.HANDOFF_FAKE_FAIL = "agent read";
   env.HANDOFF_FAKE_ERROR_CODE = "agent_not_found";
   env.HANDOFF_FAKE_PANE_GONE = "w5:p2";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true);
   assert.equal(out.closed, true);
-  assert.equal(out.message, "", "no toast for a pane the user deliberately closed");
+  assert.equal(
+    out.message,
+    "",
+    "no toast for a pane the user deliberately closed",
+  );
 });
 
 test("the source pane's screen is never read, only the target's", async () => {
   const { env, calls } = workspace();
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   for (const call of readCalls(calls)) {
     const text = call.join(" ");
-    assert.ok(!text.startsWith("pane read"), "pane scrollback is never a source of context");
+    assert.ok(
+      !text.startsWith("pane read"),
+      "pane scrollback is never a source of context",
+    );
     if (text.startsWith("agent read")) {
       assert.ok(
         !text.includes("w5:p1"),
-        `the source pane's screen must never be read: ${text}`
+        `the source pane's screen must never be read: ${text}`,
       );
     }
   }
@@ -603,9 +964,16 @@ test("the source pane's screen is never read, only the target's", async () => {
 test("only installed agents are offered to the picker", async () => {
   const { env } = workspace();
   const out = await run({ destination: "tab", env, dryRun: true });
-  assert.deepEqual(out.request.installed.map((a) => a.kind).sort(), ["claude", "codex", "pi"]);
+  assert.deepEqual(out.request.installed.map((a) => a.kind).sort(), [
+    "claude",
+    "codex",
+    "pi",
+  ]);
   assert.equal(out.request.notInstalled.length, 18);
-  assert.equal(out.request.installed.find((a) => a.kind === "pi").isSource, true);
+  assert.equal(
+    out.request.installed.find((a) => a.kind === "pi").isSource,
+    true,
+  );
 });
 
 test("the picker request describes places by label, never by raw id", async () => {
@@ -617,7 +985,11 @@ test("the picker request describes places by label, never by raw id", async () =
   const tab = await run({ destination: "tab", env, dryRun: true });
   assert.equal(tab.request.destination, "new tab in Herdr");
 
-  for (const text of [split.request.contextLine, split.request.destination, tab.request.destination]) {
+  for (const text of [
+    split.request.contextLine,
+    split.request.destination,
+    tab.request.destination,
+  ]) {
     assert.ok(!/w\d+:[pt]\d+/.test(text), `raw id leaked into "${text}"`);
   }
 });
@@ -640,7 +1012,10 @@ test("a screen showing sign-in text means the target is not ready", () => {
 test("an ordinary agent prompt counts as ready", () => {
   // Crucially, a spinner or a token counter must NOT read as "starting up": that
   // is what kept every handoff waiting out the whole cap for ninety seconds.
-  assert.equal(startingUp("> \n? for shortcuts   Gemini 3.6 Flash · low"), false);
+  assert.equal(
+    startingUp("> \n? for shortcuts   Gemini 3.6 Flash · low"),
+    false,
+  );
   assert.equal(startingUp("⠹ Working... 3%/272k · $0.04"), false);
   assert.equal(startingUp(""), false);
   assert.equal(startingUp(null), false);
@@ -660,7 +1035,11 @@ test("a usage-credit footer is not treated as an agent that cannot run", () => {
   // perfectly — it falls back to another allowance. Reading capability off a
   // status line blocked handoffs to a healthy agent.
   const footer = "Gemini 3.6 Flash · low · AI: Out of credits";
-  assert.equal(startingUp(footer), false, "a credit footer is not a startup state");
+  assert.equal(
+    startingUp(footer),
+    false,
+    "a credit footer is not a startup state",
+  );
   assert.equal(needsAnswer(footer), false, "and it is not a question either");
 });
 
@@ -672,23 +1051,45 @@ test("a startup notice scrolled into the past no longer means not ready", () => 
     "Verifying your account... please try again shortly. " +
     "x".repeat(600) +
     " > ? for shortcuts   Gemini 3.6 Flash · low";
-  assert.equal(startingUp(scrolled), false, "only the current view decides readiness");
+  assert.equal(
+    startingUp(scrolled),
+    false,
+    "only the current view decides readiness",
+  );
 
-  const current = "x".repeat(600) + " Verifying your account... please try again shortly.";
-  assert.equal(startingUp(current), true, "still showing it means still starting");
+  const current =
+    "x".repeat(600) + " Verifying your account... please try again shortly.";
+  assert.equal(
+    startingUp(current),
+    true,
+    "still showing it means still starting",
+  );
 });
 
 test("account verification counts as not ready", () => {
   // Antigravity's first-run wording, which is neither a sign-in nor a question.
-  assert.equal(startingUp("⚠ Verifying your account... Please try again shortly."), true);
+  assert.equal(
+    startingUp("⚠ Verifying your account... Please try again shortly."),
+    true,
+  );
 });
 
 test("a target showing a credit footer is still handed off to", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_FAKE_SCREEN = "Gemini 3.6 Flash low AI: Out of credits";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
-  assert.equal(out.ok, true, "the footer says nothing about whether it can take work");
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
+  assert.equal(
+    out.ok,
+    true,
+    "the footer says nothing about whether it can take work",
+  );
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
   assert.equal(prompts.length, 1);
 });
 
@@ -704,7 +1105,8 @@ test("a login menu is a question, not a ready agent", () => {
   // Measured: a fresh Antigravity pane offers "Select login method: > 1. Google
   // OAuth". A prompt typed into that is taken as a menu choice — it started an
   // OAuth flow that ended in "token exchange failed".
-  const menu = "Select login method: > 1. Google OAuth 2. Use a Google Cloud project " +
+  const menu =
+    "Select login method: > 1. Google OAuth 2. Use a Google Cloud project " +
     "[Use arrow keys to navigate, Enter to select]";
   assert.equal(needsAnswer(menu), true);
   assert.equal(needsAnswer("Press any key to go back."), true);
@@ -719,17 +1121,28 @@ test("an ordinary prompt is not mistaken for a question", () => {
 test("a target waiting on the user is never typed into", async () => {
   const { env, calls } = workspace();
   // A trust gate on screen, and Herdr reporting it blocked.
-  env.HANDOFF_FAKE_SCREEN = "Do you trust the files in this folder? 1. Yes 2. No";
+  env.HANDOFF_FAKE_SCREEN =
+    "Do you trust the files in this folder? 1. Yes 2. No";
   env.HANDOFF_FAKE_STATUS = "blocked";
   env.HANDOFF_READY_CAP_MS = "600";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.needsAttention, true);
   assert.equal(out.message, MESSAGES.needsAttention("Antigravity CLI"));
 
-  const prompts = readCalls(calls).filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 0, "typing into a trust dialog could answer it — never do it");
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(
+    prompts.length,
+    0,
+    "typing into a trust dialog could answer it — never do it",
+  );
 });
 
 test("the message for a waiting target says nothing was typed", () => {
@@ -752,17 +1165,26 @@ test("a shell listing only itself in the foreground is at its prompt", () => {
   // Windows reports the shell as its own foreground process; an empty list is
   // the POSIX shape. Both mean ready.
   assert.equal(
-    shellIsAtPrompt({ shell_pid: 100, foreground_processes: [{ pid: 100, name: "powershell.exe" }] }),
-    true
+    shellIsAtPrompt({
+      shell_pid: 100,
+      foreground_processes: [{ pid: 100, name: "powershell.exe" }],
+    }),
+    true,
   );
-  assert.equal(shellIsAtPrompt({ shell_pid: 100, foreground_processes: [] }), true);
+  assert.equal(
+    shellIsAtPrompt({ shell_pid: 100, foreground_processes: [] }),
+    true,
+  );
   assert.equal(shellIsAtPrompt({ shell_pid: 100 }), true);
 });
 
 test("a shell running something else is not at its prompt", () => {
   assert.equal(
-    shellIsAtPrompt({ shell_pid: 100, foreground_processes: [{ pid: 777, name: "node.exe" }] }),
-    false
+    shellIsAtPrompt({
+      shell_pid: 100,
+      foreground_processes: [{ pid: 777, name: "node.exe" }],
+    }),
+    false,
   );
   assert.equal(shellIsAtPrompt({}), false);
   assert.equal(shellIsAtPrompt(null), false);
@@ -771,45 +1193,82 @@ test("a shell running something else is not at its prompt", () => {
 test("agent start is used where no launch arguments are needed", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "native";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "pi" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "pi" },
+  });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a.startsWith("agent start")), "should use the documented path");
-  assert.ok(!argv.some((a) => a.startsWith("pane run")), "no need for the workaround");
+  assert.ok(
+    argv.some((a) => a.startsWith("agent start")),
+    "should use the documented path",
+  );
+  assert.ok(
+    !argv.some((a) => a.startsWith("pane run")),
+    "no need for the workaround",
+  );
 });
 
 test("the pane-shell launch includes Claude's bypass-permissions argument", async () => {
   const { env, calls } = workspace();
   env.HANDOFF_AGENT_START = "pane-run";
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
   assert.ok(
     !argv.some((a) => a.startsWith("agent start")),
-    "agent start renders an empty -ArgumentList on Windows and must be avoided"
+    "agent start renders an empty -ArgumentList on Windows and must be avoided",
   );
   assert.ok(
-    argv.some((a) => a === "pane run w5:p2 claude --dangerously-skip-permissions"),
-    `got ${JSON.stringify(argv)}`
+    argv.some(
+      (a) => a === "pane run w5:p2 claude --dangerously-skip-permissions",
+    ),
+    `got ${JSON.stringify(argv)}`,
   );
-  assert.ok(argv.some((a) => a.startsWith("agent wait w5:p2")), "must wait for readiness");
-  assert.ok(argv.some((a) => a.startsWith("agent prompt w5:p2")), "prompt addresses the pane");
+  assert.ok(
+    argv.some((a) => a.startsWith("agent wait w5:p2")),
+    "must wait for readiness",
+  );
+  assert.ok(
+    argv.some((a) => a.startsWith("agent prompt w5:p2")),
+    "prompt addresses the pane",
+  );
 });
 
 test("Antigravity starts without TERM in a Windows Herdr pane", async () => {
   const { env, home, calls } = workspace();
   env.HANDOFF_AGENT_START = "pane-run";
-  fs.writeFileSync(path.join(home, "bin", "agy"), "#!/bin/sh\n", { mode: 0o755 });
+  fs.writeFileSync(path.join(home, "bin", "agy"), "#!/bin/sh\n", {
+    mode: 0o755,
+  });
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
   assert.equal(out.ok, true);
 
   const argv = readCalls(calls).map((c) => c.join(" "));
-  const command = "pane run w5:p2 $env:TERM=''; agy --dangerously-skip-permissions";
+  const command =
+    "pane run w5:p2 $env:TERM=''; agy --dangerously-skip-permissions";
   if (process.platform === "win32") {
-    assert.ok(argv.some((a) => a === command), `got ${JSON.stringify(argv)}`);
+    assert.ok(
+      argv.some((a) => a === command),
+      `got ${JSON.stringify(argv)}`,
+    );
   } else {
-    assert.ok(argv.some((a) => a === "pane run w5:p2 agy --dangerously-skip-permissions"), `got ${JSON.stringify(argv)}`);
+    assert.ok(
+      argv.some(
+        (a) => a === "pane run w5:p2 agy --dangerously-skip-permissions",
+      ),
+      `got ${JSON.stringify(argv)}`,
+    );
   }
 });
 
@@ -817,11 +1276,20 @@ test("the workaround uses the executable name that actually resolved", async () 
   const { env, home, calls } = workspace();
   env.HANDOFF_AGENT_START = "pane-run";
   // cursor resolves as cursor-agent, not cursor.
-  fs.writeFileSync(path.join(home, "bin", "cursor-agent"), "#!/bin/sh\n", { mode: 0o755 });
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "cursor" } });
+  fs.writeFileSync(path.join(home, "bin", "cursor-agent"), "#!/bin/sh\n", {
+    mode: 0o755,
+  });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "cursor" },
+  });
   assert.equal(out.ok, true);
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(argv.some((a) => a === "pane run w5:p2 cursor-agent --yolo"), `got ${JSON.stringify(argv)}`);
+  assert.ok(
+    argv.some((a) => a === "pane run w5:p2 cursor-agent --yolo"),
+    `got ${JSON.stringify(argv)}`,
+  );
 });
 
 // opencode's only store is a single database with no per-session files, verified
@@ -831,51 +1299,115 @@ const OC_SKIP = !require("../lib/source-sqlite.js").hasSqlite()
   ? "node:sqlite unavailable (needs Node 22.5+)"
   : false;
 
-test("a large opencode session is exported once, beside its own database", { skip: OC_SKIP }, async () => {
-  const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 200 });
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+test(
+  "a large opencode session is exported once, beside its own database",
+  { skip: OC_SKIP },
+  async () => {
+    const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 200 });
+    const out = await run({
+      destination: "split",
+      env,
+      pickerChoice: { selected: "claude" },
+    });
 
-  assert.equal(out.ok, true);
-  assert.equal(out.mode, "reference");
+    assert.equal(out.ok, true);
+    assert.equal(out.mode, "reference");
 
-  const exported = path.join(path.dirname(dbPath), `herdr-handoff-${sessionId}.jsonl`);
-  assert.ok(fs.existsSync(exported), "the one documented exception");
-  assert.ok(out.prompt.includes(exported), "and the prompt points at it");
-  assert.ok(!out.prompt.includes("opencode.db"), "never at the database itself");
-});
+    const exported = path.join(
+      path.dirname(dbPath),
+      `herdr-handoff-${sessionId}.jsonl`,
+    );
+    assert.ok(fs.existsSync(exported), "the one documented exception");
+    assert.ok(out.prompt.includes(exported), "and the prompt points at it");
+    assert.ok(
+      !out.prompt.includes("opencode.db"),
+      "never at the database itself",
+    );
+  },
+);
 
-test("handing off the same opencode session twice leaves one file, not two", { skip: OC_SKIP }, async () => {
-  const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 200 });
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+test(
+  "handing off the same opencode session twice leaves one file, not two",
+  { skip: OC_SKIP },
+  async () => {
+    const { env, dbPath, sessionId } = opencodeWorkspace({ rows: 200 });
+    await run({
+      destination: "split",
+      env,
+      pickerChoice: { selected: "claude" },
+    });
+    await run({
+      destination: "split",
+      env,
+      pickerChoice: { selected: "claude" },
+    });
 
-  const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
-  assert.deepEqual(ours, [`herdr-handoff-${sessionId}.jsonl`], "overwritten, never accumulated");
-});
+    const ours = fs
+      .readdirSync(path.dirname(dbPath))
+      .filter((f) => f.startsWith("herdr-handoff-"));
+    assert.deepEqual(
+      ours,
+      [`herdr-handoff-${sessionId}.jsonl`],
+      "overwritten, never accumulated",
+    );
+  },
+);
 
-test("a small opencode session is inlined and writes nothing at all", { skip: OC_SKIP }, async () => {
-  const { env, dbPath } = opencodeWorkspace({ rows: 3, pad: 20 });
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+test(
+  "a small opencode session is inlined and writes nothing at all",
+  { skip: OC_SKIP },
+  async () => {
+    const { env, dbPath } = opencodeWorkspace({ rows: 3, pad: 20 });
+    const out = await run({
+      destination: "split",
+      env,
+      pickerChoice: { selected: "claude" },
+    });
 
-  assert.equal(out.mode, "inline");
-  const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
-  assert.deepEqual(ours, [], "under budget, opencode gets no exception either");
-});
+    assert.equal(out.mode, "inline");
+    const ours = fs
+      .readdirSync(path.dirname(dbPath))
+      .filter((f) => f.startsWith("herdr-handoff-"));
+    assert.deepEqual(
+      ours,
+      [],
+      "under budget, opencode gets no exception either",
+    );
+  },
+);
 
-test("opencode hands off with no reported session id when its database keys the cwd", { skip: OC_SKIP }, async () => {
-  // Herdr does not always report the opencode session id; recovery must find
-  // the active session in opencode.db by the pane's working directory.
-  const { env, home, dbPath, sessionId } = opencodeWorkspace({ rows: 3, pad: 20, reference: null });
-  const { DatabaseSync } = require("node:sqlite");
-  const db = new DatabaseSync(dbPath);
-  db.prepare("UPDATE session SET directory = ? WHERE id = ?").run(home, sessionId);
-  db.close();
+test(
+  "opencode hands off with no reported session id when its database keys the cwd",
+  { skip: OC_SKIP },
+  async () => {
+    // Herdr does not always report the opencode session id; recovery must find
+    // the active session in opencode.db by the pane's working directory.
+    const { env, home, dbPath, sessionId } = opencodeWorkspace({
+      rows: 3,
+      pad: 20,
+      reference: null,
+    });
+    const { DatabaseSync } = require("node:sqlite");
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE session SET directory = ? WHERE id = ?").run(
+      home,
+      sessionId,
+    );
+    db.close();
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
-  assert.equal(out.ok, true);
-  assert.equal(out.mode, "inline");
-  assert.ok(out.prompt.includes(sessionId), "the recovered session is the one handed over");
-});
+    const out = await run({
+      destination: "split",
+      env,
+      pickerChoice: { selected: "claude" },
+    });
+    assert.equal(out.ok, true);
+    assert.equal(out.mode, "inline");
+    assert.ok(
+      out.prompt.includes(sessionId),
+      "the recovered session is the one handed over",
+    );
+  },
+);
 
 test("a prompt left unsent in the composer is submitted with one Enter", async () => {
   // Measured: Claude Code parks a pasted prompt at "[Pasted text #1 +74 lines]" and
@@ -885,27 +1417,41 @@ test("a prompt left unsent in the composer is submitted with one Enter", async (
   env.HANDOFF_FAKE_NEEDS_ENTER = "1";
   env.HANDOFF_NUDGE_MS = "50";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true, out.message);
 
   const argv = readCalls(calls);
-  const enters = argv.filter((c) => c[0] === "agent" && c[1] === "send-keys" && c[3] === "enter");
+  const enters = argv.filter(
+    (c) => c[0] === "agent" && c[1] === "send-keys" && c[3] === "enter",
+  );
   assert.equal(enters.length, 1, "exactly one Enter, never a stream of them");
   assert.equal(enters[0][2], "w5:p2", "sent to the target, never the source");
 
   const prompts = argv.filter((c) => c[0] === "agent" && c[1] === "prompt");
-  assert.equal(prompts.length, 1, "the prompt itself is still submitted only once");
+  assert.equal(
+    prompts.length,
+    1,
+    "the prompt itself is still submitted only once",
+  );
 });
 
 test("an agent that submits a pasted prompt itself is never sent an Enter", async () => {
   // pi does submit on its own. Spending the Enter there would put a stray empty
   // message into a healthy handoff.
   const { env, calls } = workspace();
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true, out.message);
   assert.ok(
     !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "send-keys"),
-    "no keys are sent when the marker showed up on its own"
+    "no keys are sent when the marker showed up on its own",
   );
 });
 
@@ -917,12 +1463,16 @@ test("the Enter is never spent on a target showing a question", async () => {
   env.HANDOFF_FAKE_SCREEN = "Do you trust the files in this folder?";
   env.HANDOFF_NUDGE_MS = "50";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.needsAttention, true);
   assert.ok(
     !readCalls(calls).some((c) => c[0] === "agent" && c[1] === "send-keys"),
-    "must not answer the dialog on the user's behalf"
+    "must not answer the dialog on the user's behalf",
   );
 });
 
@@ -932,11 +1482,18 @@ test("a marker wrapped one character per line is still found", async () => {
   // was working on it, and the handoff was reported as a failure anyway.
   const { env } = workspace();
   const wrapped = briefing.SENTINEL.split("").join("\n");
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "narrow-")), "s.txt");
+  const file = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), "narrow-")),
+    "s.txt",
+  );
   fs.writeFileSync(file, `${wrapped}\n`);
 
   env.FAKE_SCREEN_FILE = file;
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true, out.message);
 });
 
@@ -945,12 +1502,16 @@ test("a target that never echoes the prompt is confirmed by working on it", asyn
   // "You 6:18 PM are taki …" while working on it for minutes. No marker can ever be
   // found there, and calling that a failure is wrong.
   const { env } = workspace();
-  env.HANDOFF_FAKE_REACTS = "never";            // the screen never shows the prompt
-  env.HANDOFF_FAKE_BUSY_AFTER_PROMPT = "1";     // idle before it, working on it after
+  env.HANDOFF_FAKE_REACTS = "never"; // the screen never shows the prompt
+  env.HANDOFF_FAKE_BUSY_AFTER_PROMPT = "1"; // idle before it, working on it after
   env.HANDOFF_NUDGE_MS = "20";
   env.HANDOFF_CONFIRM_WINDOW_MS = "100";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, true, out.message);
   assert.equal(out.message, MESSAGES.success("pi", "Claude Code", "split"));
 });
@@ -965,7 +1526,11 @@ test("a silent idle target is still a failure, not a handoff", async () => {
   env.HANDOFF_NUDGE_MS = "20";
   env.HANDOFF_CONFIRM_WINDOW_MS = "100";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.message, MESSAGES.promptFailed("Claude Code"));
 });
@@ -977,12 +1542,17 @@ test("a busy target that is still signing in is not confirmed by being busy", as
   const { env } = workspace();
   env.HANDOFF_FAKE_REACTS = "never";
   env.HANDOFF_FAKE_STATUS = "working";
-  env.HANDOFF_FAKE_SCREEN = "Verifying your account... please try again shortly.";
+  env.HANDOFF_FAKE_SCREEN =
+    "Verifying your account... please try again shortly.";
   env.HANDOFF_NUDGE_MS = "20";
   env.HANDOFF_CONFIRM_WINDOW_MS = "100";
   env.HANDOFF_DELIVERY_ATTEMPTS = "1";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false, "a signing-in agent has not accepted anything");
 });
 
@@ -992,12 +1562,16 @@ test("a target already working when the prompt arrives is not confirmed by that"
   // state" used to announce handoffs that had not happened.
   const { env } = workspace();
   env.HANDOFF_FAKE_REACTS = "never";
-  env.HANDOFF_FAKE_STATUS = "working";   // busy the whole time, before and after
+  env.HANDOFF_FAKE_STATUS = "working"; // busy the whole time, before and after
   env.HANDOFF_NUDGE_MS = "20";
   env.HANDOFF_CONFIRM_WINDOW_MS = "100";
   env.HANDOFF_DELIVERY_ATTEMPTS = "1";
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false, "already-busy is not evidence of anything");
 });
 
@@ -1025,7 +1599,11 @@ test("a banner above the input box explains a failure even though it did not del
   // Readiness is not delayed by it: the banner sits above a drawn input line.
   assert.equal(startingUp(env.HANDOFF_FAKE_SCREEN), false);
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "agy" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
   assert.equal(out.ok, false, "nothing was delivered, so nothing is announced");
   assert.equal(out.message, MESSAGES.promptFailed("Antigravity CLI"));
 });
@@ -1035,11 +1613,15 @@ test("an agent that exits leaving its pane behind is reported, not passed over",
   // crash report, leaving the shell prompt back in the pane. Treated as the user
   // closing the pane, the handoff went silent and looked like it had done nothing.
   const { env } = workspace();
-  env.HANDOFF_FAKE_FAIL = "agent read";          // the agent is gone
+  env.HANDOFF_FAKE_FAIL = "agent read"; // the agent is gone
   env.HANDOFF_FAKE_ERROR_CODE = "agent_not_found";
   // `pane get` still answers, so the pane itself survived.
 
-  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "claude" },
+  });
   assert.equal(out.ok, false);
   assert.equal(out.agentExited, true);
   assert.equal(out.message, MESSAGES.agentExited("Claude Code"));

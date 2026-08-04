@@ -31,7 +31,7 @@ server, and the upstream source. Nothing in this design rests on an assumed API.
 All four are terminal screen/scrollback projections. The spec forbids these as a transfer
 mechanism or fallback, and this design never calls `pane.read`.
 
-### 2.2 Herdr exposes a native session *reference*
+### 2.2 Herdr exposes a native session _reference_
 
 `PaneInfo` / `AgentInfo` carry:
 
@@ -61,7 +61,7 @@ discarded and only the id is kept — even though, for example, `~/.claude/hooks
 does report Claude Code's full `transcript_path`.
 
 **Consequence:** obtaining complete context requires the plugin to resolve
-*(agent kind, session id)* → the agent's own native session file on disk. This is the central
+_(agent kind, session id)_ → the agent's own native session file on disk. This is the central
 mechanism of the feature.
 
 ### 2.3 Which agents can be a source
@@ -117,19 +117,19 @@ and outlive the popup it opened.
 
 ### 2.8 Other verified calls
 
-| Need | Call |
-|---|---|
-| Source pane facts | `herdr pane get <id>` |
-| Split beside source | `herdr pane split --pane <id> --direction right --no-focus --cwd <path>` |
-| New tab in workspace | `herdr tab create --workspace <id> --no-focus --cwd <path>` |
-| List panes | `herdr pane list` |
-| Start agent | `herdr agent start <name> --kind <k> --pane <p> --timeout <ms>` |
-| Deliver prompt | `herdr agent prompt <name> <text>` |
-| Focus target | `herdr agent focus <name>` |
-| Feedback | `herdr notification show <title> --body <text>` |
-| Config path | `herdr --help` → `Config: <path>` |
+| Need                 | Call                                                                     |
+| -------------------- | ------------------------------------------------------------------------ |
+| Source pane facts    | `herdr pane get <id>`                                                    |
+| Split beside source  | `herdr pane split --pane <id> --direction right --no-focus --cwd <path>` |
+| New tab in workspace | `herdr tab create --workspace <id> --no-focus --cwd <path>`              |
+| List panes           | `herdr pane list`                                                        |
+| Start agent          | `herdr agent start <name> --kind <k> --pane <p> --timeout <ms>`          |
+| Deliver prompt       | `herdr agent prompt <name> <text>`                                       |
+| Focus target         | `herdr agent focus <name>`                                               |
+| Feedback             | `herdr notification show <title> --body <text>`                          |
+| Config path          | `herdr --help` → `Config: <path>`                                        |
 
-`herdr pane focus` only focuses a *neighbouring* pane, so `agent focus` is the correct call for
+`herdr pane focus` only focuses a _neighbouring_ pane, so `agent focus` is the correct call for
 activating the target.
 
 Response shapes matter for step 8 of §7: `pane.split` returns `pane_info`, carrying the new
@@ -147,13 +147,13 @@ CLI via `HERDR_BIN_PATH` for all Herdr access.
 
 Five layouts verified on disk. Four are flat files; one is a database.
 
-| agent | root | match | strategy |
-|---|---|---|---|
-| `claude` | `$CLAUDE_CONFIG_DIR`/`~/.claude` → `projects/*/` | file named `<id>.jsonl` | `file` |
-| `codex` | `$CODEX_HOME`/`~/.codex` → `sessions/**/` | file `rollout-*-<id>.jsonl` | `file` |
-| `pi` | `~/.pi/agent/sessions/**/` | file `*_<id>.jsonl` | `file` |
-| `grok` | `~/.grok/sessions/*/` | **directory** named `<id>`, file `chat_history.jsonl` | `file` |
-| `opencode` | `~/.local/share/opencode/opencode.db` | rows keyed on `session_id = <id>` | `sqlite` |
+| agent      | root                                             | match                                                 | strategy |
+| ---------- | ------------------------------------------------ | ----------------------------------------------------- | -------- |
+| `claude`   | `$CLAUDE_CONFIG_DIR`/`~/.claude` → `projects/*/` | file named `<id>.jsonl`                               | `file`   |
+| `codex`    | `$CODEX_HOME`/`~/.codex` → `sessions/**/`        | file `rollout-*-<id>.jsonl`                           | `file`   |
+| `pi`       | `~/.pi/agent/sessions/**/`                       | file `*_<id>.jsonl`                                   | `file`   |
+| `grok`     | `~/.grok/sessions/*/`                            | **directory** named `<id>`, file `chat_history.jsonl` | `file`   |
+| `opencode` | `~/.local/share/opencode/opencode.db`            | rows keyed on `session_id = <id>`                     | `sqlite` |
 
 > **Superseded:** `grok` is no longer a handoff source. Its Herdr integration does not report a
 > session identity, so the owning session could only be guessed. It remains a target. The
@@ -190,14 +190,14 @@ opencode migrated its session store into SQLite; `storage/` now holds only `sess
 `migration`. The database is nonetheless a **complete and losslessly extractable** transcript, keyed
 by exactly the session id the opencode integration reports. Verified schema and live row counts:
 
-| table | rows here | keyed by | relevance |
-|---|---|---|---|
-| `session` | 707 | `id` | `directory, title, agent, model, time_created` |
-| `message` | 13 910 | `session_id` | `id, time_created, data` (JSON) |
-| `part` | 54 241 | `session_id` | `id, message_id, data` (JSON) — text, tool calls, results |
-| `session_message` | 11 | `session_id` | newer message table, same shape plus `seq` |
-| `todo` | 735 | `session_id` | `content, status, priority, position` — **current task state** |
-| `event` | 23 612 | `aggregate_id` | append-only log: `message.part.updated`, `message.updated`, … |
+| table             | rows here | keyed by       | relevance                                                      |
+| ----------------- | --------- | -------------- | -------------------------------------------------------------- |
+| `session`         | 707       | `id`           | `directory, title, agent, model, time_created`                 |
+| `message`         | 13 910    | `session_id`   | `id, time_created, data` (JSON)                                |
+| `part`            | 54 241    | `session_id`   | `id, message_id, data` (JSON) — text, tool calls, results      |
+| `session_message` | 11        | `session_id`   | newer message table, same shape plus `seq`                     |
+| `todo`            | 735       | `session_id`   | `content, status, priority, position` — **current task state** |
+| `event`           | 23 612    | `aggregate_id` | append-only log: `message.part.updated`, `message.updated`, …  |
 
 `message`/`part` are the materialized projection; `event` is the append-only log behind it. Verified
 on the newest session (`ses_06af8a6fcffeIyWB7w5lX0xE7y`): 12 messages, 40 parts, 135 events.
@@ -219,7 +219,7 @@ Extraction:
    against the real store on this machine — 304 MB with a 20 MB `-wal`, opencode idle but the file
    live — a direct open plus full session export took **13 ms**. Copying first would have moved
    324 MB per handoff for no benefit. The database is never written and never locked for writing.
-2. If and only if the read-only open is *refused* (a `-wal` needing recovery, for example), fall back
+2. If and only if the read-only open is _refused_ (a `-wal` needing recovery, for example), fall back
    to copying `opencode.db`, `-wal` and `-shm` into the working directory and opening the copy
    read-only. The copies are deleted when the export finishes.
 3. Emit one JSONL line per row, in deterministic order, with every `data` column preserved verbatim:
@@ -362,7 +362,7 @@ the roster. Nothing else earns a row, because the whole interaction is meant to 
 shortcut → choose → gone.
 
 - Only available agents are navigable. The source agent is selectable and labelled
-  *same agent, fresh session*.
+  _same agent, fresh session_.
 - `?` toggles a dimmed, non-navigable block listing the not-installed kinds. The cursor never
   enters it. Default view therefore lists only installed agents, and nothing unselectable can be
   selected.
@@ -385,7 +385,7 @@ the target must happen after it closes, and per §2.7 the action process outlive
    exit — no modal, nothing created. (Requirement: never start a handoff that cannot complete.)
 4. Build the roster from `agents.available()`.
 5. Write the request file; `herdr plugin pane open --plugin agent-handoff --entrypoint picker
-   --env HERDR_HANDOFF_REQUEST=<file> --focus`. If Herdr rejects the popup because the UI is not in
+--env HERDR_HANDOFF_REQUEST=<file> --focus`. If Herdr rejects the popup because the UI is not in
    terminal mode (§2.5), retry with `--placement overlay`. This is a UI fallback only — it never
    affects what context is transferred.
 6. Wait for the result file (poll 60 ms, timeout 300 s). Cancelled or timed out → exit silently,
@@ -427,7 +427,7 @@ HANDOFF.md
 - Marked read-only: mode `0444` on POSIX, ReadOnly attribute on Windows.
 - Retention: the 20 most recent handoff directories are kept; older ones are pruned.
 
-Chunking exists to defend the *target* side of the completeness guarantee. Real sessions are large
+Chunking exists to defend the _target_ side of the completeness guarantee. Real sessions are large
 — the live pi session measured 862 KB, a codex rollout 521 KB — and a single file that big invites an
 agent to read only part of it. `HANDOFF.md` states the part count and total line count and requires
 reading every part in order, which makes "no silent omission" checkable rather than hoped for.
@@ -464,15 +464,15 @@ still applies.
 
 Every failure surfaces as a `notification show` toast, and none of them touch the source.
 
-| Condition | Message |
-|---|---|
-| Active pane has no agent | `Handoff unavailable: the active pane is not a running agent.` |
+| Condition                                                                                    | Message                                                                                            |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Active pane has no agent                                                                     | `Handoff unavailable: the active pane is not a running agent.`                                     |
 | Kind cannot be a source (§2.3), no session ref, or unresolved / ambiguous / empty transcript | `Full handoff unavailable: complete session context could not be retrieved for this source agent.` |
-| opencode source but `node:sqlite` unavailable (Node < 22.5) | `Full handoff unavailable: reading opencode's session store requires Node 22.5 or newer.` |
-| opencode row-count assertion failed | `Full handoff unavailable: complete session context could not be retrieved for this source agent.` |
-| Target pane/tab creation failed | `Handoff failed: could not create the target <split\|tab>. Source pane untouched.` |
-| `agent start` failed or timed out | `Handoff failed: <Agent> did not start. Source pane untouched.` |
-| `agent prompt` failed | `Handoff failed: <Agent> started but did not accept the handoff. Source pane untouched.` |
+| opencode source but `node:sqlite` unavailable (Node < 22.5)                                  | `Full handoff unavailable: reading opencode's session store requires Node 22.5 or newer.`          |
+| opencode row-count assertion failed                                                          | `Full handoff unavailable: complete session context could not be retrieved for this source agent.` |
+| Target pane/tab creation failed                                                              | `Handoff failed: could not create the target <split\|tab>. Source pane untouched.`                 |
+| `agent start` failed or timed out                                                            | `Handoff failed: <Agent> did not start. Source pane untouched.`                                    |
+| `agent prompt` failed                                                                        | `Handoff failed: <Agent> started but did not accept the handoff. Source pane untouched.`           |
 
 There is no truncated-transcript, scrollback, git-diff, or inferred-summary path anywhere in the
 code. `pane read` is never called, so such a fallback cannot be introduced by accident later.
@@ -492,7 +492,7 @@ Built-in `node:test`; no test dependencies.
   zero-match, multi-match and empty-file hard failures; traversal bounds; refusal for
   non-integrated kinds.
 - `source-sqlite.js`: a fixture database built to the §3.2 schema — export ordering is
-  deterministic, every row for the session is emitted, rows from *other* sessions are excluded,
+  deterministic, every row for the session is emitted, rows from _other_ sessions are excluded,
   `data` payloads survive byte-identical, the row-count assertion fails loudly on a truncated
   export, and a missing `node:sqlite` produces the specific error rather than a generic one.
   The live user database is never touched by tests.
@@ -516,7 +516,7 @@ Built-in `node:test`; no test dependencies.
 
 - Six kinds — `gemini, agy, cline, kiro, amp, maki` — cannot be sources, and the reason is a Herdr
   gap rather than a storage one. `is_official_agent_source()` excludes them, so Herdr reports no
-  `agent_session` at all for such a pane. Without a session identity the plugin cannot know *which*
+  `agent_session` at all for such a pane. Without a session identity the plugin cannot know _which_
   session the pane owns; the only alternative would be inferring it (say, the newest session for that
   cwd), and guessing wrong would transfer someone else's conversation. Inference is exactly what this
   feature forbids, so these remain targets only. See §13.3.

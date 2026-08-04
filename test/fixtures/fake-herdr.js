@@ -7,7 +7,10 @@ const args = process.argv.slice(2);
 // a fixture that answered on stdout hid a real bug for several rounds.
 if (args[0] === "fail-envelope") {
   process.stderr.write(
-    JSON.stringify({ error: { code: "pane_not_found", message: "pane w99:p99 not found" }, id: "cli:pane:get" }) + "\n"
+    JSON.stringify({
+      error: { code: "pane_not_found", message: "pane w99:p99 not found" },
+      id: "cli:pane:get",
+    }) + "\n",
   );
   process.exit(1);
 }
@@ -23,7 +26,11 @@ if (args[0] === "ok-garbage") {
 }
 
 if (args[0] === "bom") {
-  process.stdout.write("﻿" + JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) + "\n");
+  process.stdout.write(
+    "﻿" +
+      JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) +
+      "\n",
+  );
   process.exit(0);
 }
 
@@ -32,5 +39,7 @@ if (args[0] === "plain") {
   process.exit(0);
 }
 
-process.stdout.write(JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) + "\n");
+process.stdout.write(
+  JSON.stringify({ id: "cli:test", result: { type: "echo", args } }) + "\n",
+);
 process.exit(0);

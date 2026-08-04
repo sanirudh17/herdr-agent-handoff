@@ -50,7 +50,8 @@ test("patch refuses when prefix+a is already bound elsewhere", () => {
 });
 
 test("patch refuses when prefix+shift+a belongs to another command", () => {
-  const existing = '[[keys.command]]\nkey = "prefix+shift+a"\ntype = "popup"\ncommand = "lazygit"\n';
+  const existing =
+    '[[keys.command]]\nkey = "prefix+shift+a"\ntype = "popup"\ncommand = "lazygit"\n';
   const out = kb.patch(existing);
   assert.equal(out.changed, false);
   assert.deepEqual(out.conflicts, ["prefix+shift+a"]);
@@ -87,17 +88,17 @@ test("patch replaces a stale block rather than duplicating it", () => {
 
 test("patch removes an obsolete agent-handoff key even when current keys exist", () => {
   const config = [
-    '[[keys.command]]',
+    "[[keys.command]]",
     'key = "prefix+a"',
     'type = "plugin_action"',
     'command = "agent-handoff.handoff-split"',
     "",
-    '[[keys.command]]',
+    "[[keys.command]]",
     'key = "ctrl+a"',
     'type = "plugin_action"',
     'command = "agent-handoff.handoff-split"',
     "",
-    '[[keys.command]]',
+    "[[keys.command]]",
     'key = "prefix+shift+a"',
     'type = "plugin_action"',
     'command = "agent-handoff.handoff-tab"',
@@ -108,13 +109,16 @@ test("patch removes an obsolete agent-handoff key even when current keys exist",
   assert.ok(!out.text.includes('key = "ctrl+a"'));
   assert.deepEqual(
     [...out.text.matchAll(/key = "([^"]+)"/g)].map((match) => match[1]),
-    ["prefix+a", "prefix+shift+a"]
+    ["prefix+a", "prefix+shift+a"],
   );
 });
 
 test("findConfigPath prefers HERDR_CONFIG_PATH", () => {
   const p = path.join(path.sep, "custom", "config.toml");
-  assert.equal(kb.findConfigPath({ env: { HERDR_CONFIG_PATH: p }, helpOutput: "" }), p);
+  assert.equal(
+    kb.findConfigPath({ env: { HERDR_CONFIG_PATH: p }, helpOutput: "" }),
+    p,
+  );
 });
 
 test("findConfigPath reads the Config line from herdr --help", () => {
@@ -124,6 +128,12 @@ test("findConfigPath reads the Config line from herdr --help", () => {
 });
 
 test("findConfigPath falls back to the documented default", () => {
-  const got = kb.findConfigPath({ env: { HOME: path.join(path.sep, "h") }, helpOutput: "" });
-  assert.equal(got, path.join(path.sep, "h", ".config", "herdr", "config.toml"));
+  const got = kb.findConfigPath({
+    env: { HOME: path.join(path.sep, "h") },
+    helpOutput: "",
+  });
+  assert.equal(
+    got,
+    path.join(path.sep, "h", ".config", "herdr", "config.toml"),
+  );
 });

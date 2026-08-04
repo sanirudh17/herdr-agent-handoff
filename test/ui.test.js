@@ -13,7 +13,9 @@ function configWith(name) {
   return file;
 }
 
-const catppuccin = { palette: themeLib.resolveTheme(configWith("catppuccin")).palette };
+const catppuccin = {
+  palette: themeLib.resolveTheme(configWith("catppuccin")).palette,
+};
 // Rows above the agent list: tabs, blank, context, blank.
 const HEADER_ROWS_FOR_TEST = 4;
 
@@ -71,10 +73,20 @@ test("hovering a tab highlights it without switching sections", () => {
   const col = ui.renderFrame(s)[0].indexOf("not installed");
   const hovered = ui.applyHover(s, 0, col);
   assert.deepEqual(hovered.hover, { kind: "tab", key: "notInstalled" });
-  assert.equal(hovered.section, "installed", "hover must not change the section");
+  assert.equal(
+    hovered.section,
+    "installed",
+    "hover must not change the section",
+  );
 
-  const styled = ui.renderFrame({ ...hovered, theme: catppuccin }, { styled: true })[0];
-  const plainStyled = ui.renderFrame({ ...s, theme: catppuccin }, { styled: true })[0];
+  const styled = ui.renderFrame(
+    { ...hovered, theme: catppuccin },
+    { styled: true },
+  )[0];
+  const plainStyled = ui.renderFrame(
+    { ...s, theme: catppuccin },
+    { styled: true },
+  )[0];
   assert.notEqual(styled, plainStyled, "the hovered tab should look different");
 });
 
@@ -82,7 +94,11 @@ test("hovering an agent row highlights the whole row", () => {
   const s = state({ theme: catppuccin });
   const row = ui.renderFrame(s).findIndex((l) => l.includes("Codex"));
   const hovered = ui.applyHover(s, row, 5);
-  assert.deepEqual(hovered.hover, { kind: "row", section: "installed", index: 1 });
+  assert.deepEqual(hovered.hover, {
+    kind: "row",
+    section: "installed",
+    index: 1,
+  });
 
   const line = ui.renderFrame(hovered, { styled: true })[row];
   // catppuccin surface0, spanning the full width.
@@ -97,19 +113,30 @@ test("hover stays distinguishable from the accent-filled selection", () => {
   const hoverLine = hovered[row];
 
   const bgOf = (line) => (line.match(/\x1b\[48;2;\d+;\d+;\d+m/) || [""])[0];
-  assert.notEqual(bgOf(hoverLine), bgOf(cursorLine), "hover must differ from selection");
-  assert.equal(bgOf(cursorLine), "\x1b[48;2;137;180;250m", "selection is the accent");
+  assert.notEqual(
+    bgOf(hoverLine),
+    bgOf(cursorLine),
+    "hover must differ from selection",
+  );
+  assert.equal(
+    bgOf(cursorLine),
+    "\x1b[48;2;137;180;250m",
+    "selection is the accent",
+  );
 });
 
 test("every agent row reaches the pane edge, highlighted or not", () => {
   const s = state({ theme: catppuccin });
   const frame = ui.renderFrame(s);
-  const rows = frame.slice(HEADER_ROWS_FOR_TEST, HEADER_ROWS_FOR_TEST + INSTALLED.length);
+  const rows = frame.slice(
+    HEADER_ROWS_FOR_TEST,
+    HEADER_ROWS_FOR_TEST + INSTALLED.length,
+  );
   for (const [i, row] of rows.entries()) {
     assert.equal(
       row.length,
       78,
-      `row ${i} stops at the text (${row.length} chars), leaving a half-width band`
+      `row ${i} stops at the text (${row.length} chars), leaving a half-width band`,
     );
   }
 });
@@ -129,7 +156,11 @@ test("hovering the not-installed section works too", () => {
   ({ state: s } = ui.applyKey(s, "tab"));
   const row = ui.renderFrame(s).findIndex((l) => l.includes("Unavailable 1"));
   const hovered = ui.applyHover(s, row, 5);
-  assert.deepEqual(hovered.hover, { kind: "row", section: "notInstalled", index: 1 });
+  assert.deepEqual(hovered.hover, {
+    kind: "row",
+    section: "notInstalled",
+    index: 1,
+  });
 });
 
 test("hovering nothing clears the highlight", () => {
@@ -144,7 +175,7 @@ test("both tab chips are the same width so the fill is symmetrical", () => {
   const width = "not installed (14)".length; // the longer label sets the chip width
   assert.ok(
     header.includes(` ${"installed (4)".padEnd(width)} `),
-    `the shorter chip should be padded to match: ${JSON.stringify(header)}`
+    `the shorter chip should be padded to match: ${JSON.stringify(header)}`,
   );
   assert.ok(header.includes(` ${"not installed (14)".padEnd(width)} `));
 });
@@ -173,7 +204,7 @@ test("no rendered line ever exceeds the pane width", () => {
     for (const line of frame) {
       assert.ok(
         line.length <= Math.max(24, width),
-        `width ${width}: line of ${line.length} chars would wrap: ${JSON.stringify(line)}`
+        `width ${width}: line of ${line.length} chars would wrap: ${JSON.stringify(line)}`,
       );
     }
   }
@@ -181,13 +212,21 @@ test("no rendered line ever exceeds the pane width", () => {
 
 test("the source tag is dropped rather than wrapped when there is no room", () => {
   const narrow = plain(state({ width: 34 }));
-  assert.ok(!narrow.includes("fresh session"), "tag must be omitted at 34 columns");
+  assert.ok(
+    !narrow.includes("fresh session"),
+    "tag must be omitted at 34 columns",
+  );
   const wide = plain(state({ width: 78 }));
   assert.match(wide, /fresh session/, "tag should appear when it fits");
 });
 
 test("long agent names are truncated, not wrapped", () => {
-  const long = [{ kind: "verylongkind", name: "An Extremely Long Agent Name That Cannot Fit" }];
+  const long = [
+    {
+      kind: "verylongkind",
+      name: "An Extremely Long Agent Name That Cannot Fit",
+    },
+  ];
   const frame = ui.renderFrame(state({ installed: long, width: 40 }));
   for (const line of frame) assert.ok(line.length <= 40);
   assert.match(frame.join("\n"), /…/);
@@ -198,7 +237,7 @@ test("long agent names are truncated, not wrapped", () => {
 test("the frame does not repeat the popup border title", () => {
   assert.ok(
     !plain(state()).includes("Handoff to Agent"),
-    "Herdr already draws the title on the popup border"
+    "Herdr already draws the title on the popup border",
   );
 });
 
@@ -216,7 +255,11 @@ test("tab switches between the installed and not-installed sections", () => {
 test("right and left arrows move between sections", () => {
   let s = state();
   ({ state: s } = ui.applyKey(s, "right"));
-  assert.equal(s.section, "notInstalled", "right arrow should reach the not-installed tab");
+  assert.equal(
+    s.section,
+    "notInstalled",
+    "right arrow should reach the not-installed tab",
+  );
   ({ state: s } = ui.applyKey(s, "left"));
   assert.equal(s.section, "installed");
 });
@@ -233,12 +276,19 @@ test("clicking a tab label switches to that section", () => {
   const s = state();
   const header = ui.renderFrame(s)[0];
   const col = header.indexOf("not installed");
-  assert.ok(col > 0, `expected a not-installed tab in ${JSON.stringify(header)}`);
+  assert.ok(
+    col > 0,
+    `expected a not-installed tab in ${JSON.stringify(header)}`,
+  );
   const out = ui.applyClick(s, 0, col);
   assert.equal(out.state.section, "notInstalled");
   assert.equal(out.action, null, "switching sections is not a selection");
 
-  const back = ui.applyClick(out.state, 0, ui.renderFrame(out.state)[0].indexOf("installed"));
+  const back = ui.applyClick(
+    out.state,
+    0,
+    ui.renderFrame(out.state)[0].indexOf("installed"),
+  );
   assert.equal(back.state.section, "installed");
 });
 
@@ -263,12 +313,20 @@ test("the not-installed section has its own moving indicator", () => {
   const marked = (frame) => frame.filter((l) => l.includes("▸"));
 
   let frame = ui.renderFrame(s);
-  assert.equal(marked(frame).length, 1, "browsing needs a marker to show where you are");
+  assert.equal(
+    marked(frame).length,
+    1,
+    "browsing needs a marker to show where you are",
+  );
   assert.match(marked(frame)[0], /Unavailable 0/, "starts at the first entry");
 
   ({ state: s } = ui.applyKey(s, "down"));
   frame = ui.renderFrame(s);
-  assert.match(marked(frame)[0], /Unavailable 1/, "one arrow press moves one entry");
+  assert.match(
+    marked(frame)[0],
+    /Unavailable 1/,
+    "one arrow press moves one entry",
+  );
 
   ({ state: s } = ui.applyKey(s, "down"));
   ({ state: s } = ui.applyKey(s, "up"));
@@ -278,10 +336,10 @@ test("the not-installed section has its own moving indicator", () => {
 test("each section remembers where its own indicator was", () => {
   let s = state();
   ({ state: s } = ui.applyKey(s, "down"));
-  ({ state: s } = ui.applyKey(s, "down"));   // installed -> index 2
+  ({ state: s } = ui.applyKey(s, "down")); // installed -> index 2
   ({ state: s } = ui.applyKey(s, "tab"));
-  ({ state: s } = ui.applyKey(s, "down"));   // not installed -> index 1
-  ({ state: s } = ui.applyKey(s, "tab"));    // back to installed
+  ({ state: s } = ui.applyKey(s, "down")); // not installed -> index 1
+  ({ state: s } = ui.applyKey(s, "tab")); // back to installed
   assert.equal(s.cursor, 2, "the installed cursor should not have moved");
   assert.equal(s.missingCursor, 1);
 });
@@ -297,7 +355,11 @@ test("the not-installed section scrolls all the way to the last entry", () => {
   ({ state: s } = ui.applyKey(s, "tab"));
   for (let i = 0; i < 30; i += 1) ({ state: s } = ui.applyKey(s, "down"));
   const text = plain(s);
-  assert.match(text, /Unavailable 13/, "the final not-installed agent must be reachable");
+  assert.match(
+    text,
+    /Unavailable 13/,
+    "the final not-installed agent must be reachable",
+  );
 });
 
 test("page keys scroll the not-installed section", () => {
@@ -310,7 +372,8 @@ test("page keys scroll the not-installed section", () => {
 
 test("switching sections never hides installed agents", () => {
   let s = state();
-  const visibleInstalled = (text) => INSTALLED.filter((a) => text.includes(a.name)).length;
+  const visibleInstalled = (text) =>
+    INSTALLED.filter((a) => text.includes(a.name)).length;
   assert.equal(visibleInstalled(plain(s)), INSTALLED.length);
   ({ state: s } = ui.applyKey(s, "tab"));
   ({ state: s } = ui.applyKey(s, "tab"));
@@ -373,7 +436,9 @@ test("clicking outside the installed list does nothing", () => {
   assert.equal(ui.applyClick(s, 0).action, null);
   let notInstalled = state();
   ({ state: notInstalled } = ui.applyKey(notInstalled, "tab"));
-  const row = ui.renderFrame(notInstalled).findIndex((l) => l.includes("Unavailable 0"));
+  const row = ui
+    .renderFrame(notInstalled)
+    .findIndex((l) => l.includes("Unavailable 0"));
   assert.ok(row > 0);
   assert.equal(ui.applyClick(notInstalled, row).action, null);
 });
@@ -394,7 +459,10 @@ test("the frame shows section tabs, the counter, the summary and footer chips", 
 
 test("no raw pane or workspace ids leak into the frame", () => {
   const text = plain(state());
-  assert.ok(!/w\d+:[pt]\d+/.test(text), `frame should not show ids like w5:p1: ${text}`);
+  assert.ok(
+    !/w\d+:[pt]\d+/.test(text),
+    `frame should not show ids like w5:p1: ${text}`,
+  );
 });
 
 test("exactly one row carries the cursor marker", () => {
@@ -406,23 +474,47 @@ test("exactly one row carries the cursor marker", () => {
 test("styled output reproduces Herdr's settings-modal styling, never reverse video", () => {
   const frame = ui.renderFrame(state({ theme: catppuccin }), { styled: true });
   const all = frame.join("\n");
-  assert.ok(!all.includes("\x1b[7m"), "reverse video ignores the theme and must not be used");
+  assert.ok(
+    !all.includes("\x1b[7m"),
+    "reverse video ignores the theme and must not be used",
+  );
 
   // Focused row: accent fill with the panel background as text.
   const cursorRow = frame.find((l) => l.includes("Claude Code"));
-  assert.match(cursorRow, /\x1b\[48;2;137;180;250m/, "cursor row uses the accent");
-  assert.match(cursorRow, /\x1b\[38;2;24;24;37m/, "accent fills use panel_bg as text");
+  assert.match(
+    cursorRow,
+    /\x1b\[48;2;137;180;250m/,
+    "cursor row uses the accent",
+  );
+  assert.match(
+    cursorRow,
+    /\x1b\[38;2;24;24;37m/,
+    "accent fills use panel_bg as text",
+  );
 
-  assert.match(frame[0], /\x1b\[48;2;137;180;250m/, "active tab uses the accent");
-  assert.match(frame[frame.length - 1], /\x1b\[48;2;137;180;250m/, "primary chip uses the accent");
+  assert.match(
+    frame[0],
+    /\x1b\[48;2;137;180;250m/,
+    "active tab uses the accent",
+  );
+  assert.match(
+    frame[frame.length - 1],
+    /\x1b\[48;2;137;180;250m/,
+    "primary chip uses the accent",
+  );
 });
 
 test("a different theme yields different colours", () => {
-  const solarized = { palette: themeLib.resolveTheme(configWith("solarized-light")).palette };
+  const solarized = {
+    palette: themeLib.resolveTheme(configWith("solarized-light")).palette,
+  };
   const frame = ui.renderFrame(state({ theme: solarized }), { styled: true });
   const cursorRow = frame.find((l) => l.includes("Claude Code"));
   assert.match(cursorRow, /\x1b\[48;2;38;139;210m/, "solarized-light accent");
-  assert.ok(!cursorRow.includes("48;2;137;180;250"), "must not fall back to catppuccin");
+  assert.ok(
+    !cursorRow.includes("48;2;137;180;250"),
+    "must not fall back to catppuccin",
+  );
 });
 
 test("the frame respects the declared height", () => {
@@ -504,7 +596,10 @@ test("truncated notice fallback for very narrow panes", () => {
   const text = plain(s);
   const footer = text.split("\n").pop();
   assert.ok(footer.length <= 24, `footer must fit: ${footer.length} chars`);
-  assert.ok(footer.includes("Update"), "truncated notice still mentions update");
+  assert.ok(
+    footer.includes("Update"),
+    "truncated notice still mentions update",
+  );
 });
 
 test("update notice never wraps at any width", () => {
@@ -514,7 +609,7 @@ test("update notice never wraps at any width", () => {
     for (const line of frame) {
       assert.ok(
         line.length <= Math.max(24, width),
-        `width ${width}: line of ${line.length} chars would wrap: ${JSON.stringify(line)}`
+        `width ${width}: line of ${line.length} chars would wrap: ${JSON.stringify(line)}`,
       );
     }
   }

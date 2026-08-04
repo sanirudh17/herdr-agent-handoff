@@ -24,7 +24,10 @@ function notify(title) {
 
 function main() {
   const force = process.argv.includes("--force");
-  const configPath = kb.findConfigPath({ env: process.env, helpOutput: helpOutput() });
+  const configPath = kb.findConfigPath({
+    env: process.env,
+    helpOutput: helpOutput(),
+  });
 
   if (!configPath) {
     process.stderr.write("agent-handoff: could not locate config.toml\n");
@@ -47,9 +50,11 @@ function main() {
   if (!out.changed && out.conflicts.length > 0) {
     const list = out.conflicts.join(", ");
     process.stderr.write(
-      `agent-handoff: ${list} already bound to something else; re-run with --force to override\n`
+      `agent-handoff: ${list} already bound to something else; re-run with --force to override\n`,
     );
-    notify(`Agent Handoff: ${list} already bound. Re-run setup-keys with --force.`);
+    notify(
+      `Agent Handoff: ${list} already bound. Re-run setup-keys with --force.`,
+    );
     process.exit(1);
   }
 
@@ -65,7 +70,9 @@ function main() {
   try {
     herdr.run(["server", "reload-config"]);
   } catch (err) {
-    process.stderr.write(`agent-handoff: reload-config failed: ${err.message}\n`);
+    process.stderr.write(
+      `agent-handoff: reload-config failed: ${err.message}\n`,
+    );
     notify("Agent Handoff: keys written, reload config manually");
     process.exit(1);
   }

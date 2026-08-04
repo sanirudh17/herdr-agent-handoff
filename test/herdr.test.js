@@ -26,7 +26,7 @@ test("run throws HerdrCliError carrying the envelope code and message", () => {
       assert.equal(err.code, "pane_not_found");
       assert.match(err.message, /pane w99:p99 not found/);
       return true;
-    }
+    },
   );
 });
 
@@ -36,11 +36,17 @@ test("run tolerates a UTF-8 BOM on the response", () => {
 });
 
 test("run throws on non-zero exit with unparseable output", () => {
-  assert.throws(() => run([FAKE, "fail-garbage"], { env: fakeEnv }), HerdrCliError);
+  assert.throws(
+    () => run([FAKE, "fail-garbage"], { env: fakeEnv }),
+    HerdrCliError,
+  );
 });
 
 test("run throws when json is expected but output is not JSON", () => {
-  assert.throws(() => run([FAKE, "ok-garbage"], { env: fakeEnv }), HerdrCliError);
+  assert.throws(
+    () => run([FAKE, "ok-garbage"], { env: fakeEnv }),
+    HerdrCliError,
+  );
 });
 
 test("run with json:false returns raw stdout", () => {
@@ -56,13 +62,16 @@ test("a plain-text command throws when JSON is demanded, so callers must opt out
   assert.throws(
     () => run([FAKE, "plain"], { env: fakeEnv }),
     /returned no JSON result/,
-    "demanding JSON from a text command must fail loudly, not return empty"
+    "demanding JSON from a text command must fail loudly, not return empty",
   );
 });
 
 test("run throws when the binary cannot be executed", () => {
   assert.throws(
-    () => run(["x"], { env: { HERDR_BIN_PATH: path.join(__dirname, "no-such-binary-xyz") } }),
-    HerdrCliError
+    () =>
+      run(["x"], {
+        env: { HERDR_BIN_PATH: path.join(__dirname, "no-such-binary-xyz") },
+      }),
+    HerdrCliError,
   );
 });

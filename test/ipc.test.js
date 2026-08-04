@@ -41,7 +41,10 @@ test("waitForResult returns the payload once it appears", async () => {
 
 test("waitForResult returns null on timeout", async () => {
   const dir = tmp();
-  const got = await ipc.waitForResult(path.join(dir, "never.json"), { timeoutMs: 60, pollMs: 10 });
+  const got = await ipc.waitForResult(path.join(dir, "never.json"), {
+    timeoutMs: 60,
+    pollMs: 10,
+  });
   assert.equal(got, null);
 });
 

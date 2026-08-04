@@ -7,7 +7,8 @@ const agents = require("../lib/agents.js");
 
 function tempPathDir(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-path-"));
-  for (const name of files) fs.writeFileSync(path.join(dir, name), "#!/bin/sh\n", { mode: 0o755 });
+  for (const name of files)
+    fs.writeFileSync(path.join(dir, name), "#!/bin/sh\n", { mode: 0o755 });
   return dir;
 }
 
@@ -15,9 +16,29 @@ test("registry covers all 21 startable kinds", () => {
   assert.equal(agents.AGENTS.length, 21);
   assert.equal(agents.TOTAL_COUNT, 21);
   const kinds = agents.AGENTS.map((a) => a.kind);
-  for (const k of ["pi", "claude", "codex", "gemini", "cursor", "devin", "agy", "cline", "omp",
-    "mastracode", "opencode", "copilot", "kimi", "kiro", "droid", "amp", "grok", "hermes",
-    "kilo", "qodercli", "maki"]) {
+  for (const k of [
+    "pi",
+    "claude",
+    "codex",
+    "gemini",
+    "cursor",
+    "devin",
+    "agy",
+    "cline",
+    "omp",
+    "mastracode",
+    "opencode",
+    "copilot",
+    "kimi",
+    "kiro",
+    "droid",
+    "amp",
+    "grok",
+    "hermes",
+    "kilo",
+    "qodercli",
+    "maki",
+  ]) {
     assert.ok(kinds.includes(k), `missing kind ${k}`);
   }
   assert.equal(new Set(kinds).size, 21, "kinds must be unique");
@@ -25,8 +46,23 @@ test("registry covers all 21 startable kinds", () => {
 
 test("exactly the 15 session-reporting integrations can be sources", () => {
   assert.equal(agents.SOURCE_KINDS.size, 15);
-  for (const k of ["claude", "codex", "copilot", "devin", "droid", "kimi", "omp", "mastracode",
-    "pi", "hermes", "opencode", "qodercli", "kilo", "cursor", "agy"]) {
+  for (const k of [
+    "claude",
+    "codex",
+    "copilot",
+    "devin",
+    "droid",
+    "kimi",
+    "omp",
+    "mastracode",
+    "pi",
+    "hermes",
+    "opencode",
+    "qodercli",
+    "kilo",
+    "cursor",
+    "agy",
+  ]) {
     assert.ok(agents.SOURCE_KINDS.has(k), `${k} should be a source kind`);
   }
   for (const k of ["gemini", "cline", "kiro", "amp", "grok", "maki"]) {
@@ -37,8 +73,14 @@ test("exactly the 15 session-reporting integrations can be sources", () => {
 test("every agent has a friendly name, executable candidate, and explicit handoff permission mode", () => {
   for (const a of agents.AGENTS) {
     assert.ok(a.name && a.name.length > 0, `${a.kind} needs a name`);
-    assert.ok(Array.isArray(a.exec) && a.exec.length > 0, `${a.kind} needs exec candidates`);
-    assert.ok(Array.isArray(a.yoloArgs), `${a.kind} needs explicit YOLO arguments`);
+    assert.ok(
+      Array.isArray(a.exec) && a.exec.length > 0,
+      `${a.kind} needs exec candidates`,
+    );
+    assert.ok(
+      Array.isArray(a.yoloArgs),
+      `${a.kind} needs explicit YOLO arguments`,
+    );
   }
 });
 
@@ -60,7 +102,15 @@ test("handoff YOLO arguments use each agent's documented CLI spelling", () => {
   assert.deepEqual(args("droid"), ["--skip-permissions-unsafe"]);
   assert.deepEqual(args("kilo"), ["--auto"]);
   // The rest of the startable roster runs in documented YOLO mode.
-  for (const kind of ["grok", "hermes", "kimi", "kiro", "maki", "mastracode", "qodercli"]) {
+  for (const kind of [
+    "grok",
+    "hermes",
+    "kimi",
+    "kiro",
+    "maki",
+    "mastracode",
+    "qodercli",
+  ]) {
     assert.deepEqual(args(kind), ["--yolo"], `${kind} should run in YOLO mode`);
   }
 });
@@ -80,23 +130,42 @@ test("resolveExecutable finds a plain executable on PATH", () => {
 });
 
 // PATHEXT resolution only applies on Windows, so these two are Windows-only.
-const winOnly = { skip: process.platform !== "win32" ? "Windows-only behaviour" : false };
+const winOnly = {
+  skip: process.platform !== "win32" ? "Windows-only behaviour" : false,
+};
 
-test("resolveExecutable honours PATHEXT for Windows-style shims", winOnly, () => {
-  const dir = tempPathDir(["claude.cmd"]);
-  const found = agents.resolveExecutable("claude", { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" });
-  assert.equal(found, path.join(dir, "claude.cmd"));
-});
+test(
+  "resolveExecutable honours PATHEXT for Windows-style shims",
+  winOnly,
+  () => {
+    const dir = tempPathDir(["claude.cmd"]);
+    const found = agents.resolveExecutable("claude", {
+      PATH: dir,
+      PATHEXT: ".COM;.EXE;.CMD",
+    });
+    assert.equal(found, path.join(dir, "claude.cmd"));
+  },
+);
 
-test("resolveExecutable also matches .ps1 shims absent from PATHEXT", winOnly, () => {
-  const dir = tempPathDir(["pi.ps1"]);
-  const found = agents.resolveExecutable("pi", { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" });
-  assert.equal(found, path.join(dir, "pi.ps1"));
-});
+test(
+  "resolveExecutable also matches .ps1 shims absent from PATHEXT",
+  winOnly,
+  () => {
+    const dir = tempPathDir(["pi.ps1"]);
+    const found = agents.resolveExecutable("pi", {
+      PATH: dir,
+      PATHEXT: ".COM;.EXE;.CMD",
+    });
+    assert.equal(found, path.join(dir, "pi.ps1"));
+  },
+);
 
 test("resolveExecutable returns null when nothing matches", () => {
   const dir = tempPathDir([]);
-  assert.equal(agents.resolveExecutable("claude", { PATH: dir, PATHEXT: "" }), null);
+  assert.equal(
+    agents.resolveExecutable("claude", { PATH: dir, PATHEXT: "" }),
+    null,
+  );
 });
 
 // npm leaves launcher shims behind when a package is uninstalled; a shim whose
@@ -109,7 +178,7 @@ function shimDir(target) {
   }
   fs.writeFileSync(
     path.join(dir, "claude.cmd"),
-    `@ECHO off\r\nSET dp0=%~dp0\r\n"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n`
+    `@ECHO off\r\nSET dp0=%~dp0\r\n"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n`,
   );
   return dir;
 }
@@ -118,33 +187,60 @@ test("a dangling npm shim is not reported as installed", () => {
   const dir = shimDir(null); // claude.cmd exists, cli.js does not
   const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
   assert.equal(agents.resolveExecutable("claude", env), null);
-  assert.ok(!agents.available(env).some((a) => a.kind === "claude"), "dangling claude shim must not list claude");
+  assert.ok(
+    !agents.available(env).some((a) => a.kind === "claude"),
+    "dangling claude shim must not list claude",
+  );
 });
 
 test("a shim whose node_modules target exists is installed", () => {
-  const dir = shimDir(path.join("node_modules", "@anthropic-ai", "claude-code", "cli.js"));
+  const dir = shimDir(
+    path.join("node_modules", "@anthropic-ai", "claude-code", "cli.js"),
+  );
   const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
-  assert.ok(agents.resolveExecutable("claude", env), "live shim should resolve");
+  assert.ok(
+    agents.resolveExecutable("claude", env),
+    "live shim should resolve",
+  );
 });
 
 test("a real binary needs no shim validation", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-bin-"));
-  fs.writeFileSync(path.join(dir, "pi.exe"), Buffer.from([0x4d, 0x5a, 0x90, 0x00]));
+  fs.writeFileSync(
+    path.join(dir, "pi.exe"),
+    Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
+  );
   const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
-  assert.ok(agents.resolveExecutable("pi", env), "an .exe is accepted by existence");
+  assert.ok(
+    agents.resolveExecutable("pi", env),
+    "an .exe is accepted by existence",
+  );
 });
 
 test("available reflects the filesystem on every call, not a stale cache", () => {
   const dir = tempPathDir(["claude"]);
   const env = { PATH: dir, PATHEXT: "" };
-  assert.deepEqual(agents.available(env).map((a) => a.kind), ["claude"]);
-  fs.writeFileSync(path.join(dir, "cursor-agent"), "#!/bin/sh\n", { mode: 0o755 });
-  assert.deepEqual(agents.available(env).map((a) => a.kind).sort(), ["claude", "cursor"]);
+  assert.deepEqual(
+    agents.available(env).map((a) => a.kind),
+    ["claude"],
+  );
+  fs.writeFileSync(path.join(dir, "cursor-agent"), "#!/bin/sh\n", {
+    mode: 0o755,
+  });
+  assert.deepEqual(
+    agents
+      .available(env)
+      .map((a) => a.kind)
+      .sort(),
+    ["claude", "cursor"],
+  );
 });
 
 test("available reports which executable candidate resolved", () => {
   const dir = tempPathDir(["cursor-agent"]);
-  const cursor = agents.available({ PATH: dir, PATHEXT: "" }).find((a) => a.kind === "cursor");
+  const cursor = agents
+    .available({ PATH: dir, PATHEXT: "" })
+    .find((a) => a.kind === "cursor");
   assert.equal(cursor.execName, "cursor-agent");
 });
 
@@ -153,5 +249,8 @@ test("available reports only agents whose executable resolves, first candidate w
   const list = agents.available({ PATH: dir, PATHEXT: "" });
   const kinds = list.map((a) => a.kind);
   assert.deepEqual(kinds.sort(), ["claude", "cursor"]);
-  assert.equal(list.find((a) => a.kind === "cursor").executable, path.join(dir, "cursor-agent"));
+  assert.equal(
+    list.find((a) => a.kind === "cursor").executable,
+    path.join(dir, "cursor-agent"),
+  );
 });

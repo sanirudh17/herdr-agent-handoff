@@ -73,12 +73,13 @@ npm test                                   # 284 tests, node:test, no dependenci
 node bin/handoff-split.js --dry-run        # resolve and build the prompt, create nothing
 herdr plugin log list --plugin agent-handoff
 ```
+
 </details>
 
 ## Requirements
 
 - **Herdr** 0.7.5 or newer (protocol 17) — check with `herdr status`
-- **Node.js** 18 or newer on `PATH`; 22.5+ only to hand off *from* opencode, whose store needs `node:sqlite`
+- **Node.js** 18 or newer on `PATH`; 22.5+ only to hand off _from_ opencode, whose store needs `node:sqlite`
 - **One supported agent** running in the pane you hand off from — that's enough, since the source is
   always offered as a target too, as a fresh session of itself
 - **No dependencies.** Nothing to compile, nothing downloaded at install
@@ -94,7 +95,7 @@ and delivers the whole handoff inside the prompt. **It writes no files.**
   SHA-256 as of the handoff, plus ordered 1,200-line ranges to read. A 16 MB session becomes a
   4,000-character prompt.
 
-Either way the prompt opens with *"You are taking over this session from **pi**"* and tells the target
+Either way the prompt opens with _"You are taking over this session from **pi**"_ and tells the target
 to read the whole session first, treat it as history, check the workspace and prefer it where they
 disagree, preserve uncommitted work, resume from the exact stopping point, and not redo finished work.
 
@@ -119,14 +120,14 @@ targets. A source kind whose store is not configured fails with an honest reason
 <details>
 <summary>The full picture</summary>
 
-| agent | store | recovery by pane cwd |
-|---|---|---|
-| `claude` | `~/.claude/projects/*/<id>.jsonl` | yes — single transcript per project directory |
-| `codex` | `~/.codex/sessions/**/rollout-*-<id>.jsonl` | yes — first-line `payload.cwd`, unique newest |
-| `pi` | `~/.pi/agent/sessions/**/*_<id>.jsonl` | yes — single transcript per session directory |
-| `opencode` | `~/.local/share/opencode/opencode.db` (read-only SQLite) | yes — `session` table keyed by `directory` (newest unarchived, tie refuses to guess) |
-| `cline` | (no Herdr session identity) | yes — `db/sessions.db` row keyed by `workspace_root`/`cwd`, transcript `<id>.messages.json` |
-| `grok` | (no Herdr session identity) | yes — `session_search.sqlite` index keyed by cwd |
+| agent      | store                                                    | recovery by pane cwd                                                                        |
+| ---------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `claude`   | `~/.claude/projects/*/<id>.jsonl`                        | yes — single transcript per project directory                                               |
+| `codex`    | `~/.codex/sessions/**/rollout-*-<id>.jsonl`              | yes — first-line `payload.cwd`, unique newest                                               |
+| `pi`       | `~/.pi/agent/sessions/**/*_<id>.jsonl`                   | yes — single transcript per session directory                                               |
+| `opencode` | `~/.local/share/opencode/opencode.db` (read-only SQLite) | yes — `session` table keyed by `directory` (newest unarchived, tie refuses to guess)        |
+| `cline`    | (no Herdr session identity)                              | yes — `db/sessions.db` row keyed by `workspace_root`/`cwd`, transcript `<id>.messages.json` |
+| `grok`     | (no Herdr session identity)                              | yes — `session_search.sqlite` index keyed by cwd                                            |
 
 A note on **cline**: like pi, cline writes its transcript lazily — its core creates the
 session file and database row inside the first turn, so a handoff fired before the first
@@ -166,7 +167,7 @@ CI can't install Herdr or launch real agents. If you run it there, an
   command-line limit. macOS and Linux could inline much larger sessions, so handoffs there fall back to
   the file-reference mode sooner than they need to.
 
-Failures are safe on every platform: the complete session is resolved *before* anything is created, and
+Failures are safe on every platform: the complete session is resolved _before_ anything is created, and
 the source pane is only ever read. The worst outcome is a message naming the step that failed, with your
 original session untouched.
 </details>
@@ -177,29 +178,29 @@ Targets start in their own unattended/YOLO mode, so a handoff does not stop at o
 prompts. Each of the 21 startable kinds has an explicit launch policy — per-handoff only, the plugin
 does not write or change any agent configuration files:
 
-| agent | handoff launch |
-|---|---|
-| `claude` | `claude --dangerously-skip-permissions` |
-| `codex` | `codex --yolo` (no sandbox, no approvals) |
-| `pi` | `pi` — no built-in approval layer |
-| `agy` | `agy --dangerously-skip-permissions` |
-| `amp` | `amp` — approval-free by default |
-| `cline` | `cline --auto-approve true` |
-| `copilot` | `copilot --allow-all-tools` |
-| `cursor` | `cursor-agent --yolo` |
-| `devin` | `devin --permission-mode yolo` |
-| `droid` | `droid --skip-permissions-unsafe` |
-| `gemini` | `gemini --yolo` |
-| `grok` | `grok --yolo` |
-| `hermes` | `hermes --yolo` |
-| `kilo` | `kilo --auto` (autonomous, no prompts) |
-| `kimi` | `kimi --yolo` |
-| `kiro` | `kiro --yolo` |
-| `maki` | `maki --yolo` |
-| `mastracode` | `mastracode --yolo` |
-| `omp` | `omp` — no approval layer (Pi fork) |
-| `opencode` | `opencode` — permissions already default to allow |
-| `qodercli` | `qodercli --yolo` |
+| agent        | handoff launch                                    |
+| ------------ | ------------------------------------------------- |
+| `claude`     | `claude --dangerously-skip-permissions`           |
+| `codex`      | `codex --yolo` (no sandbox, no approvals)         |
+| `pi`         | `pi` — no built-in approval layer                 |
+| `agy`        | `agy --dangerously-skip-permissions`              |
+| `amp`        | `amp` — approval-free by default                  |
+| `cline`      | `cline --auto-approve true`                       |
+| `copilot`    | `copilot --allow-all-tools`                       |
+| `cursor`     | `cursor-agent --yolo`                             |
+| `devin`      | `devin --permission-mode yolo`                    |
+| `droid`      | `droid --skip-permissions-unsafe`                 |
+| `gemini`     | `gemini --yolo`                                   |
+| `grok`       | `grok --yolo`                                     |
+| `hermes`     | `hermes --yolo`                                   |
+| `kilo`       | `kilo --auto` (autonomous, no prompts)            |
+| `kimi`       | `kimi --yolo`                                     |
+| `kiro`       | `kiro --yolo`                                     |
+| `maki`       | `maki --yolo`                                     |
+| `mastracode` | `mastracode --yolo`                               |
+| `omp`        | `omp` — no approval layer (Pi fork)               |
+| `opencode`   | `opencode` — permissions already default to allow |
+| `qodercli`   | `qodercli --yolo`                                 |
 
 Account sign-in, OAuth, folder trust, and other startup dialogs are still never answered by the plugin.
 They are not tool approvals and need the user's explicit action.
