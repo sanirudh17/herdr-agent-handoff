@@ -62,8 +62,10 @@ function workspace({ agent = "pi", sessionRef = { kind: "id", value: ID }, lines
 // A workspace whose source agent is opencode: a real SQLite store, because that
 // is the one source with no per-session file to point a target at.
 const OC_SID = "ses_06af8a6fcffeIyWB7w5lX0xE7y";
-function opencodeWorkspace({ rows = 3, pad = 200 } = {}) {
-  const { env, home } = workspace({ agent: "opencode", sessionRef: { kind: "id", value: OC_SID } });
+function opencodeWorkspace({ rows = 3, pad = 200, reference } = {}) {
+  const sessionRef =
+    reference === undefined ? { kind: "id", value: OC_SID } : reference;
+  const { env, home } = workspace({ agent: "opencode", sessionRef });
   const dir = path.join(home, ".local", "share", "opencode");
   fs.mkdirSync(dir, { recursive: true });
   const dbPath = path.join(dir, "opencode.db");
@@ -72,14 +74,15 @@ function opencodeWorkspace({ rows = 3, pad = 200 } = {}) {
   const db = new DatabaseSync(dbPath);
   db.exec(`
     CREATE TABLE session (id TEXT PRIMARY KEY, project_id TEXT, directory TEXT, title TEXT,
-      agent TEXT, model TEXT, time_created INTEGER, time_updated INTEGER);
+      agent TEXT, model TEXT, time_created INTEGER, time_updated INTEGER,
+      parent_id TEXT, time_archived INTEGER);
     CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER,
       time_updated INTEGER, data TEXT);
     CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT,
       time_created INTEGER, time_updated INTEGER, data TEXT);
   `);
-  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)")
-    .run(OC_SID, "proj", "/w", "Fix the parser", "build", "opus", 1, 2);
+  db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?,?)")
+    .run(OC_SID, "proj", "/w", "Fix the parser", "build", "opus", 1, 2, null, null);
   const insert = db.prepare("INSERT INTO message VALUES (?,?,?,?,?)");
   for (let i = 0; i < rows; i += 1) {
     insert.run(`m${i}`, OC_SID, i, i, JSON.stringify({ role: "user", text: "x".repeat(pad) }));
@@ -137,7 +140,8 @@ test("an over-budget source that is not readable text reports no full context", 
 
   const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.noContext);
+  assert.equal(out.message, MESSAGES.noContext("the session is too large to inline and not readable as text"));
+  assert.equal(out.detail, "the session is too large to inline and not readable as text");
 });
 
 test("a pane with no agent fails before opening the picker", async () => {
@@ -149,20 +153,120 @@ test("a pane with no agent fails before opening the picker", async () => {
   assert.ok(!argv.some((a) => a.startsWith("plugin pane open")), "picker must not open");
 });
 
-test("an unresolvable source fails before opening the picker", async () => {
+test("an unresolvable source still opens the picker; the refusal names the reason", async () => {
   const { env, calls } = workspace({ agent: "claude" });
-  const out = await run({ destination: "tab", env });
+  const out = await run({ destination: "tab", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.noContext);
+  assert.equal(out.message, MESSAGES.noContext("claude session store directory not found"));
+  assert.equal(out.detail, "claude session store directory not found");
   const argv = readCalls(calls).map((c) => c.join(" "));
-  assert.ok(!argv.some((a) => a.startsWith("plugin pane open")), "picker must not open");
+  assert.ok(!argv.some((a) => a.startsWith("tab create")), "nothing may be created");
 });
 
-test("a non-integrated source kind fails with the context message", async () => {
-  const { env } = workspace({ agent: "agy", sessionRef: null });
-  const out = await run({ destination: "tab", env });
+test("the picker opens even when the source context cannot be resolved yet", async () => {
+  const { env, calls } = workspace({ agent: "claude" });
+  const out = await run({ destination: "tab", env, pickerTimeoutMs: 150 });
+  assert.equal(out.cancelled, true, "an unanswered picker times out as a cancel");
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(argv.some((a) => a.startsWith("plugin pane open")), "the picker must open");
+});
+
+test("a non-integrated source kind refuses with the reason after the choice", async () => {
+  const { env, calls } = workspace({ agent: "agy", sessionRef: null });
+  const out = await run({ destination: "tab", env, pickerChoice: { selected: "claude" } });
   assert.equal(out.ok, false);
-  assert.equal(out.message, MESSAGES.noContext);
+  assert.equal(out.message, MESSAGES.noContext("Herdr reported no session reference for agy"));
+});
+
+// cline persists its session only after the first exchange (its core writes the
+// transcript inside executeTurn). These tests mirror what cline's own writes
+// leave behind: an open row in sessions.db plus the session's messages file.
+function clineSession(home, sid = "1785820760831_zksgo") {
+  const data = path.join(home, ".cline", "data");
+  const dbPath = path.join(data, "db", "sessions.db");
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(dbPath);
+  db.exec("CREATE TABLE sessions (session_id TEXT, started_at TEXT, ended_at TEXT, cwd TEXT, workspace_root TEXT)");
+  db.prepare("INSERT INTO sessions VALUES (?,?,?,?,?)").run(sid, new Date().toISOString(), null, home, home);
+  db.close();
+  const file = path.join(data, "sessions", sid, `${sid}.messages.json`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify([{ role: "user", content: "fix it" }]) + "\n");
+  return file;
+}
+
+test("cline with a persisted session hands off end to end", async () => {
+  const { env, home, calls } = workspace({ agent: "cline", sessionRef: null });
+  const file = clineSession(home);
+  const out = await run({ destination: "tab", env, pickerChoice: { selected: "pi" } });
+  assert.equal(out.ok, true);
+  assert.equal(out.message, "Handoff started: Cline → pi (new tab)");
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(argv.some((a) => a.startsWith("tab create")), "the target is created");
+  assert.ok(fs.existsSync(file), "the transcript is read in place, never moved");
+});
+
+test("cline without a persisted transcript waits, then hands off after the first exchange", async () => {
+  const { env, home } = workspace({ agent: "cline", sessionRef: null });
+  // cline writes its transcript when the first exchange lands; the handoff must
+  // wait for that write instead of dying on the spot.
+  const timer = setTimeout(() => clineSession(home), 250);
+  try {
+    const out = await run({
+      destination: "tab",
+      env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "40", HANDOFF_RESOLVE_RETRIES: "50" },
+      pickerChoice: { selected: "pi" },
+    });
+    assert.equal(out.ok, true);
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
+test("cline with nothing persisted refuses and names why", async () => {
+  const { env } = workspace({ agent: "cline", sessionRef: null });
+  const out = await run({
+    destination: "tab",
+    env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "20", HANDOFF_RESOLVE_RETRIES: "2" },
+    pickerChoice: { selected: "pi" },
+  });
+  assert.equal(out.ok, false);
+  assert.match(out.message, /cline has no persisted session for .* yet; cline writes its transcript after the first exchange/);
+});
+
+test("a session file that appears late is waited out (lazy persistence)", async () => {
+  const { env, file } = workspace();
+  // pi writes its session file only after the first assistant reply; a handoff
+  // racing that write must wait briefly instead of failing.
+  fs.rmSync(file);
+  const timer = setTimeout(() => {
+    fs.writeFileSync(file, JSON.stringify({ i: 1 }) + "\n");
+  }, 250);
+  try {
+    const out = await run({
+      destination: "tab",
+      env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "40", HANDOFF_RESOLVE_RETRIES: "50" },
+      dryRun: true,
+    });
+    assert.equal(out.ok, true);
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
+test("a session file that never appears fails after a bounded wait", async () => {
+  const { env, home } = workspace();
+  fs.rmSync(path.join(home, ".pi"), { recursive: true, force: true });
+  const start = Date.now();
+  const out = await run({
+    destination: "tab",
+    env: { ...env, HANDOFF_RESOLVE_RETRY_MS: "20", HANDOFF_RESOLVE_RETRIES: "5" },
+    pickerChoice: { selected: "claude" },
+  });
+  assert.equal(out.ok, false);
+  assert.match(out.message, /pi session store directory not found/);
+  assert.ok(Date.now() - start < 5000, "the wait must be bounded");
 });
 
 test("cancelling the picker leaves nothing created and reports nothing", async () => {
@@ -756,6 +860,21 @@ test("a small opencode session is inlined and writes nothing at all", { skip: OC
   assert.equal(out.mode, "inline");
   const ours = fs.readdirSync(path.dirname(dbPath)).filter((f) => f.startsWith("herdr-handoff-"));
   assert.deepEqual(ours, [], "under budget, opencode gets no exception either");
+});
+
+test("opencode hands off with no reported session id when its database keys the cwd", { skip: OC_SKIP }, async () => {
+  // Herdr does not always report the opencode session id; recovery must find
+  // the active session in opencode.db by the pane's working directory.
+  const { env, home, dbPath, sessionId } = opencodeWorkspace({ rows: 3, pad: 20, reference: null });
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(dbPath);
+  db.prepare("UPDATE session SET directory = ? WHERE id = ?").run(home, sessionId);
+  db.close();
+
+  const out = await run({ destination: "split", env, pickerChoice: { selected: "claude" } });
+  assert.equal(out.ok, true);
+  assert.equal(out.mode, "inline");
+  assert.ok(out.prompt.includes(sessionId), "the recovered session is the one handed over");
 });
 
 test("a prompt left unsent in the composer is submitted with one Enter", async () => {

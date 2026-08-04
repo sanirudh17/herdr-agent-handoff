@@ -28,6 +28,20 @@ test("text with no newline at all is not line-oriented", () => {
   assert.equal(isReadableText(Buffer.from("one single line, no terminator", "utf8")), false);
 });
 
+test("a literal replacement character does not make real text unreadable", () => {
+  // Real transcripts carry U+FFFD when an agent captured already-mangled
+  // output; the bytes are valid UTF-8 and the lines are lines.
+  const body = Buffer.from('{"a":"\uFFFD"}\n{"b":2}\n', "utf8");
+  assert.equal(isReadableText(body), true);
+});
+
+test("a long first line hides no newline from the probe window", () => {
+  // agy's planner records put the whole tool-call payload on line one; the
+  // probe must still find a newline further in.
+  const head = "x".repeat(32 * 1024) + "\n";
+  assert.equal(isReadableText(Buffer.from(head + "y\n", "utf8")), true);
+});
+
 test("only the first 64KB is probed, so a late NUL does not disqualify a huge transcript", () => {
   const head = Buffer.from("{}\n".repeat(30000), "utf8");
   assert.ok(head.length > READABLE_PROBE_BYTES);

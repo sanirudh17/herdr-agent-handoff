@@ -16,17 +16,19 @@ follow-up prompt to write.
 
 The source pane is never closed, interrupted, modified, or sent input.
 
+The supplier list is computed by scanning `PATH` **and validating launchers** — an npm
+shim whose `node_modules` target was deleted by an uninstall is not "installed" — so
+leftover launcher files from an uninstalled package never appear in the picker.
+
 ```
-  installed (7)        not installed (14)             7 / 21 available
+  installed (5)        not installed (16)             5 / 21 available
 
  pi in w5:p1 · 112 lines  →  new tab in workspace 5
 
-  ▸ Claude Code      claude
-    Codex            codex
+  ▸ Codex            codex
     pi               pi
     Antigravity CLI  agy
-    Grok             grok
-    Hermes Agent     hermes
+    Cline            cline
     opencode         opencode
 
 
@@ -103,26 +105,41 @@ truncated transcript, terminal output, a git diff, or a summary. The source pane
 
 Any of the 21 agent kinds Herdr can start can be a **target**, if its binary is on your `PATH`.
 
-**Sources** are the 15 agents whose Herdr integration reports a session identity. Verified against real
-session stores: `claude`, `codex`, `pi`, `opencode`, `agy`.
+**Sources** are the agents Herdr reports a session identity for — `claude`, `codex`, `pi`, `opencode`,
+`agy`, plus the other official sources. When the native reference is missing or points at nothing (a
+session too young to have a transcript, a reference gone stale after an in-agent `/resume`), the source
+is re-resolved from its own store by the pane's working directory: pi, claude and cline keep
+cwd-keyed transcripts, codex rollouts carry their cwd on the first line, grok indexes sessions by
+cwd, and opencode's session table records the directory it ran in (newest activity wins). A store
+with no unique match **fails closed** — nothing is ever guessed, and no target pane is
+created until complete context exists. Sources that report no session identity and have no
+recoverable store (`gemini`, `kiro`, `amp`, `maki`) still cannot be sources; they work fine as
+targets. A source kind whose store is not configured fails with an honest reason naming the gap.
 
 <details>
 <summary>The full picture</summary>
 
-| agent | store |
-|---|---|
-| `claude` | `~/.claude/projects/*/<id>.jsonl` |
-| `codex` | `~/.codex/sessions/**/rollout-*-<id>.jsonl` |
-| `pi` | `~/.pi/agent/sessions/**/*_<id>.jsonl` |
-| `opencode` | `~/.local/share/opencode/opencode.db` (read-only SQLite) |
+| agent | store | recovery by pane cwd |
+|---|---|---|
+| `claude` | `~/.claude/projects/*/<id>.jsonl` | yes — single transcript per project directory |
+| `codex` | `~/.codex/sessions/**/rollout-*-<id>.jsonl` | yes — first-line `payload.cwd`, unique newest |
+| `pi` | `~/.pi/agent/sessions/**/*_<id>.jsonl` | yes — single transcript per session directory |
+| `opencode` | `~/.local/share/opencode/opencode.db` (read-only SQLite) | yes — `session` table keyed by `directory` (newest unarchived, tie refuses to guess) |
+| `cline` | (no Herdr session identity) | yes — `db/sessions.db` row keyed by `workspace_root`/`cwd`, transcript `<id>.messages.json` |
+| `grok` | (no Herdr session identity) | yes — `session_search.sqlite` index keyed by cwd |
+
+A note on **cline**: like pi, cline writes its transcript lazily — its core creates the
+session file and database row inside the first turn, so a handoff fired before the first
+exchange waits briefly and then explains that there is nothing persisted yet ("cline has no
+persisted session for … yet; cline writes its transcript after the first exchange").
 
 Supported with documented but untested store locations: `copilot`, `devin`, `droid`, `kimi`,
 `qodercli`, `kilo`, `cursor`, `mastracode`, `hermes`, `omp`. Each is verified at runtime and fails hard
 rather than degrading, so an untested resolver can never produce a partial transfer.
 
-`gemini`, `cline`, `grok`, `kiro`, `amp` and `maki` **cannot be sources** — their Herdr
-integration reports no session identity, so the owning session could only be guessed. They work fine as
-targets.
+The handoff opens the picker even when the source context cannot be resolved yet; if it still cannot be
+retrieved after you choose a target, the refusal says why (and a missing transcript is waited out
+briefly — pi writes its session file only after the first assistant reply).
 
 One exception to writing nothing: an opencode session too large to inline is exported to
 `herdr-handoff-<session>.jsonl` beside `opencode.db`, overwritten each time. opencode keeps everything

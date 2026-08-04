@@ -99,6 +99,41 @@ test("resolveExecutable returns null when nothing matches", () => {
   assert.equal(agents.resolveExecutable("claude", { PATH: dir, PATHEXT: "" }), null);
 });
 
+// npm leaves launcher shims behind when a package is uninstalled; a shim whose
+// node_modules target is gone must not count as installed.
+function shimDir(target) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-shim-"));
+  if (target) {
+    fs.mkdirSync(path.join(dir, path.dirname(target)), { recursive: true });
+    fs.writeFileSync(path.join(dir, target), "#!/usr/bin/env node\n");
+  }
+  fs.writeFileSync(
+    path.join(dir, "claude.cmd"),
+    `@ECHO off\r\nSET dp0=%~dp0\r\n"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n`
+  );
+  return dir;
+}
+
+test("a dangling npm shim is not reported as installed", () => {
+  const dir = shimDir(null); // claude.cmd exists, cli.js does not
+  const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+  assert.equal(agents.resolveExecutable("claude", env), null);
+  assert.ok(!agents.available(env).some((a) => a.kind === "claude"), "dangling claude shim must not list claude");
+});
+
+test("a shim whose node_modules target exists is installed", () => {
+  const dir = shimDir(path.join("node_modules", "@anthropic-ai", "claude-code", "cli.js"));
+  const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+  assert.ok(agents.resolveExecutable("claude", env), "live shim should resolve");
+});
+
+test("a real binary needs no shim validation", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-bin-"));
+  fs.writeFileSync(path.join(dir, "pi.exe"), Buffer.from([0x4d, 0x5a, 0x90, 0x00]));
+  const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+  assert.ok(agents.resolveExecutable("pi", env), "an .exe is accepted by existence");
+});
+
 test("available reflects the filesystem on every call, not a stale cache", () => {
   const dir = tempPathDir(["claude"]);
   const env = { PATH: dir, PATHEXT: "" };
