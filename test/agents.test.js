@@ -169,23 +169,41 @@ test("resolveExecutable returns null when nothing matches", () => {
 });
 
 // npm leaves launcher shims behind when a package is uninstalled; a shim whose
-// node_modules target is gone must not count as installed.
+// node_modules target is gone must not count as installed. npm writes the same
+// shape on every platform: a tiny text shim pointing into node_modules —
+// claude.cmd on Windows, a bare `claude` shell script elsewhere.
 function shimDir(target) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-shim-"));
+  const shimName = process.platform === "win32" ? "claude.cmd" : "claude";
   if (target) {
     fs.mkdirSync(path.join(dir, path.dirname(target)), { recursive: true });
     fs.writeFileSync(path.join(dir, target), "#!/usr/bin/env node\n");
   }
-  fs.writeFileSync(
-    path.join(dir, "claude.cmd"),
-    `@ECHO off\r\nSET dp0=%~dp0\r\n"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n`,
-  );
+  if (process.platform === "win32") {
+    fs.writeFileSync(
+      path.join(dir, shimName),
+      `@ECHO off\r\nSET dp0=%~dp0\r\n"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n`,
+    );
+  } else {
+    fs.writeFileSync(
+      path.join(dir, shimName),
+      '#!/bin/sh\nbasedir=$(dirname "$0")\nexec node "$basedir/node_modules/@anthropic-ai/claude-code/cli.js" "$@"\n',
+      { mode: 0o755 },
+    );
+  }
   return dir;
 }
 
+function shimEnv(dir) {
+  return {
+    PATH: dir,
+    PATHEXT: process.platform === "win32" ? ".COM;.EXE;.CMD" : "",
+  };
+}
+
 test("a dangling npm shim is not reported as installed", () => {
-  const dir = shimDir(null); // claude.cmd exists, cli.js does not
-  const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+  const dir = shimDir(null); // the launcher exists, its cli.js target does not
+  const env = shimEnv(dir);
   assert.equal(agents.resolveExecutable("claude", env), null);
   assert.ok(
     !agents.available(env).some((a) => a.kind === "claude"),
@@ -197,7 +215,7 @@ test("a shim whose node_modules target exists is installed", () => {
   const dir = shimDir(
     path.join("node_modules", "@anthropic-ai", "claude-code", "cli.js"),
   );
-  const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+  const env = shimEnv(dir);
   assert.ok(
     agents.resolveExecutable("claude", env),
     "live shim should resolve",
@@ -206,14 +224,16 @@ test("a shim whose node_modules target exists is installed", () => {
 
 test("a real binary needs no shim validation", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-bin-"));
-  fs.writeFileSync(
-    path.join(dir, "pi.exe"),
-    Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
-  );
-  const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+  const name = process.platform === "win32" ? "pi.exe" : "pi";
+  const header =
+    process.platform === "win32"
+      ? Buffer.from([0x4d, 0x5a, 0x90, 0x00]) // MZ
+      : Buffer.from([0x7f, 0x45, 0x4c, 0x46]); // ELF magic
+  fs.writeFileSync(path.join(dir, name), header);
+  const env = shimEnv(dir);
   assert.ok(
     agents.resolveExecutable("pi", env),
-    "an .exe is accepted by existence",
+    "a real binary is accepted by existence",
   );
 });
 

@@ -677,8 +677,18 @@ test("counts lines correctly when the file has no trailing newline", () => {
   assert.equal(got.lines, 2);
 });
 
+// opencode stores session directories with forward slashes on every platform,
+// while the pane cwd Herdr reports uses the host's native separators. Build
+// the pair from a real path so recovery is exercised on both win32 (where the
+// separators genuinely differ) and posix (where they already match).
+function opencodeCwdPair(home) {
+  const paneCwd = path.join(home, "one drive", "Herdr Plugin");
+  return { paneCwd, storedCwd: paneCwd.replace(/\\/g, "/") };
+}
+
 test("opencode: without a reference, recovery keys on the pane cwd", () => {
   const home = tmpHome();
+  const { paneCwd, storedCwd } = opencodeCwdPair(home);
   const dbPath = writeFile(
     path.join(home, ".local", "share", "opencode", "opencode.db"),
     "",
@@ -688,37 +698,39 @@ test("opencode: without a reference, recovery keys on the pane cwd", () => {
   db.exec(
     "CREATE TABLE session (id TEXT, directory TEXT, time_updated INTEGER, parent_id TEXT, time_archived INTEGER)",
   );
+  // the pane cwd matches only through opencode's forward-slash spelling plus
+  // case-folding; an archived row, a sub-session, and a foreign cwd must lose
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_old",
-    "C:/Users/sanir/Herdr Plugin",
+    storedCwd,
     1000,
     null,
     null,
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_fwd",
-    "C:/Users/sanir/Herdr plugin",
+    storedCwd.replace(/Plugin$/, "plugin"),
     2000,
     null,
     null,
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_sub",
-    "C:/Users/sanir/Herdr Plugin",
+    storedCwd,
     3000,
     "ses_old",
     null,
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_arch",
-    "C:/Users/sanir/Herdr Plugin",
+    storedCwd,
     4000,
     null,
     5000,
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_other",
-    "C:/Other",
+    path.join(home, "elsewhere").replace(/\\/g, "/"),
     9999,
     null,
     null,
@@ -727,7 +739,7 @@ test("opencode: without a reference, recovery keys on the pane cwd", () => {
   const got = resolve({
     agent: "opencode",
     sessionRef: null,
-    cwd: CWD,
+    cwd: paneCwd,
     homedir: home,
     env: {},
   });
@@ -739,6 +751,7 @@ test("opencode: without a reference, recovery keys on the pane cwd", () => {
 
 test("opencode: sessions of equal activity for one cwd refuse to guess", () => {
   const home = tmpHome();
+  const { paneCwd, storedCwd } = opencodeCwdPair(home);
   const dbPath = writeFile(
     path.join(home, ".local", "share", "opencode", "opencode.db"),
     "",
@@ -750,14 +763,14 @@ test("opencode: sessions of equal activity for one cwd refuse to guess", () => {
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_a",
-    "C:/Users/sanir/Herdr Plugin",
+    storedCwd,
     7,
     null,
     null,
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_b",
-    "C:/Users/sanir/Herdr Plugin",
+    storedCwd,
     7,
     null,
     null,
@@ -768,7 +781,7 @@ test("opencode: sessions of equal activity for one cwd refuse to guess", () => {
       resolve({
         agent: "opencode",
         sessionRef: null,
-        cwd: CWD,
+        cwd: paneCwd,
         homedir: home,
         env: {},
       }),
@@ -780,6 +793,7 @@ test("opencode: sessions of equal activity for one cwd refuse to guess", () => {
 
 test("opencode: no session for the pane cwd reports the missing store record", () => {
   const home = tmpHome();
+  const { paneCwd } = opencodeCwdPair(home);
   writeFile(path.join(home, ".local", "share", "opencode", "opencode.db"), "");
   const { DatabaseSync } = require("node:sqlite");
   const db = new DatabaseSync(
@@ -790,7 +804,7 @@ test("opencode: no session for the pane cwd reports the missing store record", (
   );
   db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(
     "ses_x",
-    "C:/Elsewhere",
+    path.join(home, "elsewhere").replace(/\\/g, "/"),
     1,
     null,
     null,
@@ -801,7 +815,7 @@ test("opencode: no session for the pane cwd reports the missing store record", (
       resolve({
         agent: "opencode",
         sessionRef: null,
-        cwd: CWD,
+        cwd: paneCwd,
         homedir: home,
         env: {},
       }),
