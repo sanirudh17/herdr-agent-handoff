@@ -129,6 +129,41 @@ test("resolveExecutable finds a plain executable on PATH", () => {
   assert.equal(found, path.join(dir, "claude"));
 });
 
+const posixOnly = {
+  skip: process.platform === "win32" ? "POSIX-only behaviour" : false,
+};
+
+test(
+  "resolveExecutable finds a symlinked executable on PATH",
+  posixOnly,
+  () => {
+    const dir = tempPathDir(["claude-real"]);
+    fs.symlinkSync("claude-real", path.join(dir, "claude"));
+
+    const found = agents.resolveExecutable("claude", {
+      PATH: dir,
+      PATHEXT: "",
+    });
+    assert.equal(found, path.join(dir, "claude"));
+  },
+);
+
+test(
+  "resolveExecutable rejects a dangling executable symlink",
+  posixOnly,
+  () => {
+    const dir = tempPathDir([]);
+    fs.symlinkSync("missing-claude", path.join(dir, "claude"));
+    const env = { PATH: dir, PATHEXT: "" };
+
+    assert.equal(agents.resolveExecutable("claude", env), null);
+    assert.ok(
+      !agents.available(env).some((agent) => agent.kind === "claude"),
+      "dangling claude symlink must not list claude",
+    );
+  },
+);
+
 // PATHEXT resolution only applies on Windows, so these two are Windows-only.
 const winOnly = {
   skip: process.platform !== "win32" ? "Windows-only behaviour" : false,
