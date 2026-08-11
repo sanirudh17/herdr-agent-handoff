@@ -249,6 +249,26 @@ if (argv[0] === "agent" && argv[1] === "get") {
   });
 }
 
+// A per-pane boot stamp so timing modes can measure "time since the pane first
+// appeared" across the many separate fixture processes Herdr spawns.
+function bootSince(file) {
+  let boot = 0;
+  try {
+    boot = Number(fs.readFileSync(file, "utf8")) || 0;
+  } catch {
+    // missing or unwritable stamp: treat the pane as booted now
+  }
+  if (!boot) {
+    boot = Date.now();
+    try {
+      fs.writeFileSync(file, String(boot));
+    } catch {
+      // unwritable state dir: treat the pane as booted now
+    }
+  }
+  return boot;
+}
+
 // The target's screen. A healthy agent echoes the prompt it was given, so the
 // recorded calls are the source of truth: if a prompt was submitted, it shows.
 // HANDOFF_FAKE_REACTS=never models a TUI that swallows input while still starting.
@@ -347,22 +367,43 @@ if (argv[0] === "agent" && argv[1] === "read") {
   }
   const draw = process.env.HANDOFF_FAKE_FROZEN === "1" ? "" : ` p${submitted}`;
 
-  // HANDOFF_FAKE_ECHO_THEN_DROP models Antigravity discarding a prompt it briefly
-  // echoed: the text shows on the first read after submission and is replaced by
-  // startup wording on every read after that.
+  // HANDOFF_FAKE_ECHO_THEN_DROP models Antigravity discarding a prompt while its
+  // account check runs. Two shapes, one per knob:
+  //   ECHO_THEN_DROP alone: each submission is echoed for exactly one read, then
+  //     startup wording replaces it forever — the check never finishes, and the
+  //     plugin's persistence check must refuse the delivery.
+  //   + HANDOFF_FAKE_ECHO_CLEAR_MS=n: the pane swallows every submission while
+  //     the check runs (the post-submit read sees startup wording, which the
+  //     plugin's fast-path rejects) and reads show the submission's text once
+  //     verification is done, so a retried prompt survives.
   if (process.env.HANDOFF_FAKE_ECHO_THEN_DROP === "1" && submitted > 0) {
-    const seenFile = `${callsFile}.echoes`;
-    let reads = 0;
-    try {
-      reads = Number(fs.readFileSync(seenFile, "utf8")) || 0;
-    } catch {
-      // missing file reads as zero
+    const clearMs = Number(process.env.HANDOFF_FAKE_ECHO_CLEAR_MS || "0");
+    let body;
+    if (clearMs > 0) {
+      // Keep state files portable: a raw "w5:p2" is an NTFS alternate-stream
+      // name, which would hide the boot stamp from directory listings.
+      const paneKey = String(argv[2]).replace(/[^A-Za-z0-9._-]/g, "_");
+      body =
+        Date.now() - bootSince(`${callsFile}.boot.${paneKey}`) >= clearMs
+          ? text
+          : "Verifying your account... please try again shortly.";
+    } else {
+      const seenFile = `${callsFile}.echoes`;
+      let echoed = 0;
+      try {
+        echoed = Number(fs.readFileSync(seenFile, "utf8")) || 0;
+      } catch {
+        // missing file reads as zero
+      }
+      if (echoed < submitted) {
+        // The one read that shows the freshly submitted prompt: the echo.
+        body = text;
+        fs.writeFileSync(seenFile, String(echoed + 1));
+      } else {
+        // The echo did not survive: startup wording in its place, forever.
+        body = "Verifying your account... please try again shortly.";
+      }
     }
-    fs.writeFileSync(seenFile, String(reads + 1));
-    const body =
-      reads === 0
-        ? text
-        : "Verifying your account... please try again shortly.";
     process.stdout.write(`${body}${draw}\n`);
     process.exit(0);
   }

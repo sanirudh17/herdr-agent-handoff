@@ -63,7 +63,7 @@ function workspace({
     HANDOFF_FAKE_SESSION: JSON.stringify(sessionRef),
     // Real delivery backoff spans about a minute; the tests should not.
     HANDOFF_SETTLE_MS: "0",
-    HANDOFF_AGY_SETTLE_MS: "0",
+    HANDOFF_AGY_TUI_SETTLE_MS: "0",
     HANDOFF_STILL_MS: "0",
     HANDOFF_READY_CAP_MS: "0",
     HANDOFF_CONFIRM_WINDOW_MS: "300",
@@ -1156,9 +1156,66 @@ test("a slow-starting target is announced instead of leaving a silent pane", () 
   assert.match(MESSAGES.startingUp("Antigravity CLI"), /Antigravity CLI/);
 });
 
-test("Antigravity waits 10 seconds before the handoff prompt", () => {
-  assert.equal(timings({}).agySettle, 10000);
-  assert.equal(timings({ HANDOFF_AGY_SETTLE_MS: "8000" }).agySettle, 8000);
+test("agy: holds the handoff after its TUI first renders", async () => {
+  assert.equal(timings({}).agyTuiSettle, 15000);
+  assert.equal(
+    timings({ HANDOFF_AGY_TUI_SETTLE_MS: "12000" }).agyTuiSettle,
+    12000,
+  );
+
+  const { env, calls } = workspace();
+  // Agy starts its subscription/credit check only after the TUI is painted. This
+  // short test override proves the hold starts from that frame, before the normal
+  // readiness gate is allowed to paste.
+  env.HANDOFF_AGY_TUI_SETTLE_MS = "1200";
+  env.HANDOFF_FAKE_NO_SEQ = "1";
+  const started = Date.now();
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
+  const elapsed = Date.now() - started;
+  assert.equal(out.ok, true);
+  assert.ok(elapsed >= 1100, `TUI hold was skipped (took ${elapsed}ms)`);
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(prompts.length, 1);
+});
+
+test("agy: a prompt swallowed by a late account check is re-sent once it clears", async () => {
+  const { env, calls } = workspace();
+  // The check is invisible until the first prompt is submitted: the pane
+  // swallows it — the post-submit read sees startup wording, and the plugin's
+  // fast-path re-sends once that wording clears. All state-driven, no clock.
+  env.HANDOFF_FAKE_ECHO_THEN_DROP = "1";
+  env.HANDOFF_FAKE_ECHO_CLEAR_MS = "1500";
+  env.HANDOFF_AGY_TUI_SETTLE_MS = "0";
+  env.HANDOFF_FAKE_NO_SEQ = "1"; // keep the agent idle: the phrase drives the gate
+  env.HANDOFF_SETTLE_MS = "200";
+  env.HANDOFF_STILL_MS = "300";
+  env.HANDOFF_READY_CAP_MS = "10000";
+  const started = Date.now();
+  const out = await run({
+    destination: "split",
+    env,
+    pickerChoice: { selected: "agy" },
+  });
+  const elapsed = Date.now() - started;
+  assert.equal(out.ok, true, "delivery recovers without any fixed clock");
+  assert.ok(
+    elapsed < 9000,
+    `recovery must not wait out a clock (took ${elapsed}ms)`,
+  );
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(
+    prompts.length,
+    2,
+    "the first attempt dropped, the second delivered",
+  );
 });
 
 test("a shell listing only itself in the foreground is at its prompt", () => {
