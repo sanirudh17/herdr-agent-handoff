@@ -11,6 +11,7 @@ const {
   needsAnswer,
   usable,
   readScreenForTest,
+  launchCommandForTest,
   flat,
   inputLineIndex,
   timings,
@@ -805,6 +806,38 @@ test("readScreen hands back the screen with its lines intact", () => {
   assert.ok(
     got.includes("\n"),
     "this is the guard: no newline means the line rules cannot fire",
+  );
+});
+
+test("readScreen falls back to Cline's visible alternate-screen frame", () => {
+  const calls = [];
+  const call = (args) => {
+    calls.push(args);
+    if (args.includes("recent-unwrapped")) {
+      throw new Error(
+        "cannot read 400 lines while w1:p1 is working: its alternate-screen history can only be captured by scrolling while idle. Wait and retry, or use --source visible",
+      );
+    }
+    return "Cline's visible TUI frame\n";
+  };
+
+  assert.equal(readScreenForTest(call, "w1:p1"), "Cline's visible TUI frame\n");
+  assert.deepEqual(
+    calls.map((args) => args[4]),
+    ["recent-unwrapped", "visible"],
+  );
+});
+
+test("Cline handoff launch disables only Cline's automatic npm updater", () => {
+  const command = launchCommandForTest(
+    { execName: "cline", yoloArgs: ["--auto-approve", "true"] },
+    "cline",
+  );
+  assert.equal(
+    command,
+    process.platform === "win32"
+      ? "$env:CLINE_NO_AUTO_UPDATE='1'; cline --auto-approve true"
+      : "CLINE_NO_AUTO_UPDATE=1 cline --auto-approve true",
   );
 });
 
