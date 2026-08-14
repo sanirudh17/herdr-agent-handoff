@@ -185,7 +185,7 @@ does not write or change any agent configuration files:
 | `pi`         | `pi` — no built-in approval layer                 |
 | `agy`        | `agy --dangerously-skip-permissions`              |
 | `amp`        | `amp` — approval-free by default                  |
-| `cline`      | `cline --auto-approve true`                       |
+| `cline`      | `cline --auto-approve true --tui`                 |
 | `copilot`    | `copilot --allow-all-tools`                       |
 | `cursor`     | `cursor-agent --yolo`                             |
 | `devin`      | `devin --permission-mode yolo`                    |

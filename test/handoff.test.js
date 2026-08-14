@@ -830,14 +830,14 @@ test("readScreen falls back to Cline's visible alternate-screen frame", () => {
 
 test("Cline handoff launch disables only Cline's automatic npm updater", () => {
   const command = launchCommandForTest(
-    { execName: "cline", yoloArgs: ["--auto-approve", "true"] },
+    { execName: "cline", yoloArgs: ["--auto-approve", "true", "--tui"] },
     "cline",
   );
   assert.equal(
     command,
     process.platform === "win32"
-      ? "$env:CLINE_NO_AUTO_UPDATE='1'; cline --auto-approve true"
-      : "CLINE_NO_AUTO_UPDATE=1 cline --auto-approve true",
+      ? "$env:CLINE_NO_AUTO_UPDATE='1'; cline --auto-approve true --tui"
+      : "CLINE_NO_AUTO_UPDATE=1 cline --auto-approve true --tui",
   );
 });
 
@@ -900,6 +900,24 @@ test("Grok's box-drawn prompt is found when the capture has lines", () => {
     inputLineIndex(["╭─────────╮", "│ >       │", "╰─ Grok ──╯"]),
     1,
   );
+});
+
+test("Cline's TUI prompt is recognized as an active input line", () => {
+  const clineScreen = [
+    "What can I do for you?",
+    "────────────────────────────────────────────────────────────────────",
+    "❯ What can I do for you?",
+    "────────────────────────────────────────────────────────────────────",
+    "DeepSeek V4 Flash (xhigh) ██████ (0) $0.00 ○ Plan ● Act (Tab)",
+    "Herdr plugin (main) | 4 files +10 -7",
+    "⏵⏵ Auto-approve all enabled (Shift+Tab)",
+  ].join("\n");
+
+  const lines = clineScreen.split("\n");
+  const i = inputLineIndex(lines);
+  assert.ok(i >= 0, "Cline's ❯ prompt is an input line");
+  assert.equal(startingUp(clineScreen), false);
+  assert.equal(needsAnswer(clineScreen), false);
 });
 
 test("a capture with no newlines falls back to the character tail rather than guessing", () => {

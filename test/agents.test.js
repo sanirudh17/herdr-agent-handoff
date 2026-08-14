@@ -90,7 +90,7 @@ test("handoff YOLO arguments use each agent's documented CLI spelling", () => {
   assert.deepEqual(args("codex"), ["--yolo"]);
   // opencode's permissions already default to allow, so it needs no switch.
   assert.deepEqual(args("opencode"), []);
-  assert.deepEqual(args("cline"), ["--auto-approve", "true"]);
+  assert.deepEqual(args("cline"), ["--auto-approve", "true", "--tui"]);
   assert.deepEqual(args("copilot"), ["--allow-all-tools"]);
   assert.deepEqual(args("cursor"), ["--yolo"]);
   assert.deepEqual(args("gemini"), ["--yolo"]);
