@@ -146,3 +146,21 @@ test("checkUpdateAsync returns false with no cache", () => {
 test("CURRENT_VERSION is a valid semver string", () => {
   assert.match(CURRENT_VERSION, /^\d+\.\d+\.\d+$/);
 });
+
+test("package.json, herdr-plugin.toml and CURRENT_VERSION agree", () => {
+  // The update banner compares the GitHub release tag against
+  // CURRENT_VERSION, while users and Herdr see package.json and the
+  // manifest. If any of the three drifts, the popup fires wrongly or not
+  // at all — so the release process must keep them identical.
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+  );
+  const manifest = fs.readFileSync(
+    path.join(__dirname, "..", "herdr-plugin.toml"),
+    "utf8",
+  );
+  const manifestVersion = manifest.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+  assert.ok(manifestVersion, "herdr-plugin.toml must declare a version");
+  assert.equal(CURRENT_VERSION, pkg.version);
+  assert.equal(CURRENT_VERSION, manifestVersion);
+});
