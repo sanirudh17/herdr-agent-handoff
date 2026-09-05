@@ -31,7 +31,7 @@ function setup() {
   return { dir, requestPath, resultPath };
 }
 
-function runPicker(requestPath, keys) {
+function runPicker(requestPath, keys, extraEnv = {}) {
   return spawnSync(process.execPath, [PICKER], {
     input: keys.join("\n") + "\n",
     encoding: "utf8",
@@ -39,9 +39,53 @@ function runPicker(requestPath, keys) {
       ...process.env,
       HERDR_HANDOFF_REQUEST: requestPath,
       HANDOFF_PICKER_HEADLESS: "1",
+      ...extraEnv,
     },
   });
 }
+
+// Seeds an update notice by pre-writing a fresh cache, so the headless picker
+// shows one without any network. Returns env overrides for runPicker.
+function updateEnv(latestVersion) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-pick-upd-"));
+  fs.writeFileSync(
+    path.join(dir, "update-cache.json"),
+    JSON.stringify({ lastCheckUnix: Date.now(), latestVersion }),
+  );
+  return {
+    HERDR_PLUGIN_STATE_DIR: dir,
+    UPDATE_FAKE_INSTALL: path.join(
+      __dirname,
+      "fixtures",
+      "fake-herdr-install.js",
+    ),
+  };
+}
+
+test("i installs the update and reports success in the picker", () => {
+  const { requestPath, resultPath } = setup();
+  const res = runPicker(requestPath, ["i"], updateEnv("9.9.9"));
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /Updating to v9\.9\.9/, "updating line shown");
+  assert.match(res.stdout, /✓ Updated to v9\.9\.9/, "success reported");
+  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), {
+    cancelled: true,
+  });
+});
+
+test("a failed install keeps the picker usable and says why", () => {
+  const { requestPath, resultPath } = setup();
+  const res = runPicker(requestPath, ["i"], {
+    ...updateEnv("9.9.9"),
+    FAKE_HERDR_INSTALL_FAIL: "1",
+  });
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(res.stdout, /✗ Update failed/, "failure reported");
+  assert.match(res.stdout, /Update v9\.9\.9 available/, "notice retained");
+  assert.deepEqual(JSON.parse(fs.readFileSync(resultPath, "utf8")), {
+    cancelled: true,
+  });
+});
 
 test("selecting with enter writes the chosen kind", () => {
   const { requestPath, resultPath } = setup();
