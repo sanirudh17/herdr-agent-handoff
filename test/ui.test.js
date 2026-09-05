@@ -635,3 +635,95 @@ test("dismissing update restores normal footer in next render", () => {
   assert.ok(!text.includes("Update"), "notice gone after dismiss");
   assert.match(text, /↑↓ select/, "normal hints restored");
 });
+
+// --- one-key install (`i`) ---------------------------------------------------
+
+test("i key starts an install while a notice is showing", () => {
+  const s = state({ updateNotice: { available: true, version: "0.2.0" } });
+  const out = ui.applyKey(s, "i");
+  assert.equal(out.state.updating, true, "install marked in flight");
+  assert.deepEqual(out.action, { installUpdate: "0.2.0" });
+});
+
+test("I key starts an install like lowercase i", () => {
+  const s = state({ updateNotice: { available: true, version: "0.2.0" } });
+  const out = ui.applyKey(s, "I");
+  assert.deepEqual(out.action, { installUpdate: "0.2.0" });
+});
+
+test("i key does nothing without a notice or while installing", () => {
+  assert.equal(ui.applyKey(state(), "i").action, null, "no notice");
+  const busy = state({
+    updateNotice: { available: true, version: "0.2.0" },
+    updating: true,
+  });
+  const out = ui.applyKey(busy, "i");
+  assert.equal(out.action, null, "no second install while one runs");
+  assert.equal(out.state.updating, true);
+});
+
+test("notice footer offers install and dismiss when they fit", () => {
+  const s = state({
+    width: 120,
+    updateNotice: { available: true, version: "0.2.0" },
+  });
+  const footer = ui.renderFrame(s).pop();
+  assert.match(footer, /Update available.*v0\.2\.0/);
+  assert.match(footer, /i install/);
+  assert.match(footer, /u dismiss/);
+});
+
+test("short notice footer offers both chips at medium widths", () => {
+  const s = state({
+    width: 60,
+    updateNotice: { available: true, version: "0.2.0" },
+  });
+  const footer = ui.renderFrame(s).pop();
+  assert.match(footer, /Update v0\.2\.0 available/);
+  assert.match(footer, /i install/);
+  assert.match(footer, /u dismiss/);
+  assert.ok(footer.length <= 60, `footer must fit: ${footer.length} chars`);
+});
+
+test("narrow notice footer keeps dismiss; i still works", () => {
+  const notice = { available: true, version: "0.2.0" };
+  const s = state({ width: 40, updateNotice: notice });
+  const footer = ui.renderFrame(s).pop();
+  assert.match(footer, /u dismiss/);
+  assert.ok(footer.length <= 40, `footer must fit: ${footer.length} chars`);
+  assert.deepEqual(ui.applyKey(s, "i").action, { installUpdate: "0.2.0" });
+});
+
+test("updating footer names the version being installed", () => {
+  const s = state({
+    updateNotice: { available: true, version: "0.2.0" },
+    updating: true,
+  });
+  assert.match(plain(s), /Updating to v0\.2\.0/);
+});
+
+test("install outcome footer reports success and failure", () => {
+  const ok = plain(state({ updateStatus: { ok: true, version: "0.2.0" } }));
+  assert.match(ok, /✓ Updated to v0\.2\.0/);
+  const bad = plain(state({ updateStatus: { ok: false, message: "boom" } }));
+  assert.match(bad, /✗ Update failed: boom/);
+});
+
+test("install footer states never wrap at any width", () => {
+  const variants = [
+    { updateNotice: { available: true, version: "0.2.0" }, updating: true },
+    { updateStatus: { ok: true, version: "0.2.0" } },
+    { updateStatus: { ok: false, message: "some long failure reason" } },
+  ];
+  for (const v of variants) {
+    for (const width of [24, 34, 40, 56, 78, 120]) {
+      const frame = ui.renderFrame(state({ width, ...v }));
+      for (const line of frame) {
+        assert.ok(
+          line.length <= Math.max(24, width),
+          `width ${width}: line of ${line.length} chars would wrap`,
+        );
+      }
+    }
+  }
+});

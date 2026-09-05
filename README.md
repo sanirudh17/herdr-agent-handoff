@@ -44,6 +44,9 @@ herdr plugin install sanirudh17/herdr-agent-handoff
 herdr plugin action invoke agent-handoff.setup-keys
 ```
 
+When a newer release exists, the picker footer says so — press `i` to install it from inside
+the picker, `u` to dismiss the notice for that version.
+
 `setup-keys` backs up your `config.toml`, adds the two keybindings, and reloads. It won't overwrite
 `prefix+a` or `prefix+shift+a` if you've already bound them — re-run with `--force`, or add them by
 hand. (`prefix+h` was avoided on purpose: it's Herdr's default `focus_pane_left`.)

@@ -66,6 +66,42 @@ function drawHeadless(state) {
   process.stdout.write(ui.renderFrame(state).join("\n") + "\n\f");
 }
 
+// Runs the upgrade the notice advertises and folds the outcome back into
+// picker state. applyKey has already set updating:true, so the footer shows
+// the Updating line while the install blocks. Never throws: a failed upgrade
+// keeps the notice (retryable, dismissible) and the picker fully usable.
+function runInstall(state) {
+  const version =
+    state.updateNotice && state.updateNotice.version
+      ? state.updateNotice.version
+      : "unknown";
+  let result;
+  try {
+    result = updateMod.installUpdate();
+  } catch (err) {
+    result = {
+      ok: false,
+      message: (err && err.message ? err.message : String(err)).slice(0, 120),
+    };
+  }
+  trace(`install update v${version}: ${result.ok ? "ok" : result.message}`);
+  if (result.ok) {
+    return {
+      ...state,
+      updating: false,
+      updateNotice: null,
+      updateStatus: { ok: true, version },
+      settledAt: Date.now(),
+    };
+  }
+  return {
+    ...state,
+    updating: false,
+    updateStatus: { ok: false, message: result.message },
+    settledAt: Date.now(),
+  };
+}
+
 function draw(state, frame) {
   const lines = frame || ui.renderFrame(state, { styled: true });
   process.stdout.write("\x1b[H\x1b[2J" + lines.join("\r\n"));
@@ -94,6 +130,10 @@ function runHeadless(request) {
     .filter(Boolean)) {
     const out = ui.applyKey(state, key);
     state = out.state;
+    if (out.action && out.action.installUpdate) {
+      drawHeadless(state); // updating line, before the blocking install
+      state = runInstall(state);
+    }
     drawHeadless(state);
     if (out.action && out.action.select) {
       return finish(request.resultPath, { selected: out.action.select }, null);
@@ -141,6 +181,28 @@ function runInteractive(request) {
       state = out.state;
       if (out.action && out.action.dismissUpdate) {
         updateMod.dismissUpdate(out.action.dismissUpdate);
+      }
+      if (out.action && out.action.installUpdate) {
+        // Show the Updating line first: stdout to a terminal flushes on
+        // write, so the user sees it before the blocking install starts.
+        draw(state);
+        state = runInstall(state);
+        draw(state);
+        continue;
+      }
+      // Keys hammered while the install blocked arrive as one buffered burst
+      // the moment input flows again. A select/cancel among them was aimed
+      // at the install, not the picker — drop it rather than handing off or
+      // blinking out from under the user.
+      if (
+        state.settledAt &&
+        Date.now() - state.settledAt < 500 &&
+        out.action &&
+        (out.action.select || out.action.cancel)
+      ) {
+        state = { ...state, settledAt: 0 };
+        draw(state);
+        continue;
       }
       if (out.action && out.action.select) {
         // Show the choice before the popup disappears, so the selection is

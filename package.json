@@ -1,6 +1,6 @@
 {
   "name": "herdr-agent-handoff",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Full-session ownership transfer between Herdr-supported coding agents",
   "license": "MIT",
   "author": "Anirudh S K",
