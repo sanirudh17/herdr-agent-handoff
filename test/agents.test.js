@@ -129,6 +129,123 @@ test("resolveExecutable finds a plain executable on PATH", () => {
   assert.equal(found, path.join(dir, "claude"));
 });
 
+const posixOnly = {
+  skip: process.platform === "win32" ? "POSIX-only behaviour" : false,
+};
+
+test(
+  "resolveExecutable finds a symlinked executable on PATH",
+  posixOnly,
+  () => {
+    const dir = tempPathDir(["claude-real"]);
+    fs.symlinkSync("claude-real", path.join(dir, "claude"));
+
+    const found = agents.resolveExecutable("claude", {
+      PATH: dir,
+      PATHEXT: "",
+    });
+    assert.equal(found, path.join(dir, "claude"));
+  },
+);
+
+test(
+  "resolveExecutable rejects a dangling executable symlink",
+  posixOnly,
+  () => {
+    const dir = tempPathDir([]);
+    fs.symlinkSync("missing-claude", path.join(dir, "claude"));
+    const env = { PATH: dir, PATHEXT: "" };
+
+    assert.equal(agents.resolveExecutable("claude", env), null);
+    assert.ok(
+      !agents.available(env).some((agent) => agent.kind === "claude"),
+      "dangling claude symlink must not list claude",
+    );
+  },
+);
+
+test(
+  "a symlinked shim validates node_modules relative to its target",
+  posixOnly,
+  () => {
+    // The PATH entry is a symlink to a text shim elsewhere. The node_modules
+    // reference inside the shim is relative to the real file, so validation
+    // must resolve the link first.
+    const target = path.join(
+      "node_modules",
+      "@anthropic-ai",
+      "claude-code",
+      "cli.js",
+    );
+    const realDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-real-"));
+    fs.mkdirSync(path.join(realDir, path.dirname(target)), {
+      recursive: true,
+    });
+    fs.writeFileSync(path.join(realDir, target), "#!/usr/bin/env node\n");
+    fs.writeFileSync(
+      path.join(realDir, "claude-real"),
+      '#!/bin/sh\nexec node "$basedir/node_modules/@anthropic-ai/claude-code/cli.js" "$@"\n',
+      { mode: 0o755 },
+    );
+    const linkDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-link-"));
+    fs.symlinkSync(
+      path.join(realDir, "claude-real"),
+      path.join(linkDir, "claude"),
+    );
+    const env = { PATH: linkDir, PATHEXT: "" };
+    assert.equal(
+      agents.resolveExecutable("claude", env),
+      path.join(linkDir, "claude"),
+    );
+  },
+);
+
+test(
+  "a symlinked shim with a missing node_modules target is not installed",
+  posixOnly,
+  () => {
+    const realDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-real-"));
+    fs.writeFileSync(
+      path.join(realDir, "claude-real"),
+      '#!/bin/sh\nexec node "$basedir/node_modules/@anthropic-ai/claude-code/cli.js" "$@"\n',
+      { mode: 0o755 },
+    );
+    const linkDir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-link-"));
+    fs.symlinkSync(
+      path.join(realDir, "claude-real"),
+      path.join(linkDir, "claude"),
+    );
+    const env = { PATH: linkDir, PATHEXT: "" };
+    assert.equal(agents.resolveExecutable("claude", env), null);
+    assert.ok(
+      !agents.available(env).some((a) => a.kind === "claude"),
+      "symlinked shim with missing target must not list claude",
+    );
+  },
+);
+
+test(
+  "a dangling symlink with a binary extension is not installed",
+  posixOnly,
+  () => {
+    // isLiveShim accepts .exe/.com by existence; a dangling link with that
+    // extension must still be rejected since its target is gone. Looked up
+    // by full filename because PATHEXT only applies on Windows.
+    const dir = tempPathDir([]);
+    fs.symlinkSync("missing-claude", path.join(dir, "claude.exe"));
+    const env = { PATH: dir, PATHEXT: ".COM;.EXE;.CMD" };
+    assert.equal(agents.resolveExecutable("claude.exe", env), null);
+  },
+);
+
+test("a symlink to a directory is not an executable", posixOnly, () => {
+  const dir = tempPathDir([]);
+  fs.mkdirSync(path.join(dir, "real-dir"));
+  fs.symlinkSync("real-dir", path.join(dir, "claude"));
+  const env = { PATH: dir, PATHEXT: "" };
+  assert.equal(agents.resolveExecutable("claude", env), null);
+});
+
 // PATHEXT resolution only applies on Windows, so these two are Windows-only.
 const winOnly = {
   skip: process.platform !== "win32" ? "Windows-only behaviour" : false,
