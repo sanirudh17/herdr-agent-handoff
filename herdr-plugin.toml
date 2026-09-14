@@ -54,3 +54,14 @@ height = "60%"
 # prefix stripped) and required by absolute path. Independent of cwd on every
 # platform.
 command = ["node", "-e", '''require(require('path').join((process.env.HERDR_PLUGIN_ROOT || process.cwd()).replace(/^\\\\\?\\/, ''), 'bin', 'picker.js'))''']
+
+[[panes]]
+id = "mode-picker"
+title = "Choose Handoff Context"
+description = "Choose focused handoff or full session transcript"
+placement = "popup"
+width = "70%"
+height = "40%"
+# Same Windows-safe `node -e` pattern as the picker pane: Herdr gives plugin
+# panes a \\?\ cwd that Node cannot resolve a relative main script from.
+command = ["node", "-e", '''require(require('path').join((process.env.HERDR_PLUGIN_ROOT || process.cwd()).replace(/^\\\\\?\\/, ''), 'bin', 'mode-picker.js'))''']

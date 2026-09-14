@@ -8,11 +8,27 @@
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 
 Hand an in-progress task from the agent in your active pane to a **fresh session of another installed
-agent**, carrying the complete source session with it. No summary, no truncated transcript, no
-follow-up prompt to write.
+agent**. Choose how much context travels: a concise focused summary by default, or the complete
+source session when exact history matters. No truncated transcript, no follow-up prompt to write.
 
 - **`prefix+a`** — the new agent opens in a split beside the source
 - **`prefix+shift+a`** — the new agent opens in a new tab in the same workspace
+
+Invoking a handoff shows two popups in sequence: first the handoff context
+(`Focused handoff`, the default, or `Full session transcript`), then the existing
+target-agent picker.
+
+- **Focused handoff (recommended default).** The source agent writes a concise
+  continuation summary — current objective, completed work, current state,
+  remaining work, constraints, pitfalls not to redo, relevant files — and only
+  that summary travels as the main prompt. The full transcript, when a safe
+  reference exists, is labeled as an optional fallback the target must not read
+  by default. This prevents chained handoffs from replaying old diagnoses, old
+  bugs, and old instructions that were already resolved later in the history.
+- **Full session transcript.** The historical behavior, unchanged: the complete
+  source session is embedded when it fits the prompt budget, or referenced by
+  path with line bounds and SHA-256 when it does not. Useful for exact archival
+  transfer when every historical turn matters.
 
 The source pane is never closed, interrupted, modified, or sent input.
 
@@ -72,7 +88,7 @@ To work on the plugin, link a clone instead of installing:
 
 ```bash
 herdr plugin link /path/to/herdr-agent-handoff
-npm test                                   # 284 tests, node:test, no dependencies
+npm test                                   # 388 tests, node:test, no dependencies
 node bin/handoff-split.js --dry-run        # resolve and build the prompt, create nothing
 herdr plugin log list --plugin agent-handoff
 ```
@@ -91,19 +107,28 @@ herdr plugin log list --plugin agent-handoff
 
 Herdr stores no transcripts, and terminal scrollback isn't history. What Herdr does expose is a native
 session reference for the focused pane, so the plugin resolves that to the agent's **own** session file
-and delivers the whole handoff inside the prompt. **It writes no files.**
+and delivers the handoff inside the prompt.
+
+**Full session transcript mode** (historical behavior, unchanged):
 
 - **Session fits the prompt** → the transcript is embedded verbatim. Nothing on disk, nothing to read.
 - **Session is too large** → the prompt names the source agent's own transcript with its line count and
-  SHA-256 as of the handoff, plus ordered 1,200-line ranges to read. A 16 MB session becomes a
-  4,000-character prompt.
+  SHA-256 as of the handoff. A 16 MB session becomes a 4,000-character prompt.
 
-Either way the prompt opens with _"You are taking over this session from **pi**"_ and tells the target
+Either way the full prompt opens with _"You are taking over this session from **pi**"_ and tells the target
 to read the whole session first, treat it as history, check the workspace and prefer it where they
 disagree, preserve uncommitted work, resume from the exact stopping point, and not redo finished work.
 
-**If the complete session can't be obtained, the handoff doesn't start.** There's no fallback to a
-truncated transcript, terminal output, a git diff, or a summary. The source pane is only ever read.
+**Focused handoff mode** (default): the source agent — the one that owns the current context — writes
+a concise continuation summary to a temp file under the plugin state dir (outside your repo), and the
+plugin delivers that summary as the main prompt. The target is told to treat the summary as authoritative,
+not to restart from history, not to redo completed work, and not to replay old transcript steps. A safe
+transcript path, when one exists, is included only as an explicitly optional fallback.
+
+**If the complete session can't be obtained, a full handoff doesn't start.** There's no fallback to a
+truncated transcript, terminal output, a git diff, or a summary. Likewise, if the source agent fails to
+produce a focused summary, no target pane is created. The source pane is only ever read (focused mode
+prompts it once to request the summary, and never for anything else).
 
 ## Agent support
 
