@@ -121,7 +121,7 @@ test("focused mode tells the target not to redo or replay history", () => {
 
 test("focused mode ends in stop-and-wait, never autonomous action", () => {
   const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
-  assert.match(text, /Send a status message/);
+  assert.match(text, /medium-length status summary/);
   assert.match(text, /Send it before anything else/);
   assert.match(text, /STOP\./);
   assert.match(text, /Wait for the user's next instruction/);
@@ -129,15 +129,25 @@ test("focused mode ends in stop-and-wait, never autonomous action", () => {
   assert.ok(!text.includes("proceed directly"));
 });
 
-test("the focused status message is a neat bullet report", () => {
+test("the focused status message is a medium-length flowing summary", () => {
   const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
+  assert.match(text, /medium-length status summary/);
+  assert.match(text, /150.250 words/);
+  for (const part of [
+    "background and objective",
+    "completed work with key files and decisions",
+    "current state and stopping point",
+    "next steps",
+  ]) {
+    assert.ok(text.includes(part), `status shape must cover ${part}`);
+  }
   for (const bullet of [
     "**Objective**",
     "**Done**",
     "**Stopping point**",
     "**Next**",
   ]) {
-    assert.ok(text.includes(bullet), `status shape must name ${bullet}`);
+    assert.ok(!text.includes(bullet), `no bullet template anymore: ${bullet}`);
   }
 });
 

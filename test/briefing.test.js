@@ -102,7 +102,7 @@ test("the handoff is a context transfer ending in stop-and-wait", () => {
     inlineOf('{"n":1}\n'),
     renderReference({ meta: META, session: bigSession(3000) }),
   ]) {
-    assert.match(text, /Send a status message/);
+    assert.match(text, /medium-length status summary/);
     assert.match(text, /Send it before anything else/);
     assert.match(text, /STOP\./);
     assert.match(text, /Wait for the user's next instruction/);
@@ -134,18 +134,28 @@ test("a finished task stops without re-verifying by re-implementing", () => {
   assert.match(text, /touch the todo list/i);
 });
 
-test("the status message is a neat bullet report, still with no tools", () => {
+test("the status message is a medium-length flowing summary", () => {
   const text = inlineOf('{"n":1}\n');
+  assert.match(text, /medium-length status summary/);
+  assert.match(text, /150.250 words/);
+  for (const part of [
+    "background and objective",
+    "completed work with key files and decisions",
+    "current state and stopping point",
+    "next steps",
+  ]) {
+    assert.ok(text.includes(part), `status shape must cover ${part}`);
+  }
+  assert.match(text, /ready for your next instruction/i);
+  assert.match(text, /No tools until the user directs/i);
   for (const bullet of [
     "**Objective**",
     "**Done**",
     "**Stopping point**",
     "**Next**",
   ]) {
-    assert.ok(text.includes(bullet), `status shape must name ${bullet}`);
+    assert.ok(!text.includes(bullet), `no bullet template anymore: ${bullet}`);
   }
-  assert.match(text, /ready for your next instruction/i);
-  assert.match(text, /No tools until the user directs/i);
 });
 
 test("the handoff never orders autonomous continuation", () => {
