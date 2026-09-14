@@ -97,6 +97,37 @@ test("the prompt opens with an ordered set of actions, not a wall of rules", () 
   assert.ok(doThis < rules, "actions should come before the rules");
 });
 
+test("the status message is gated before any workspace tool use", () => {
+  for (const text of [
+    inlineOf('{"n":1}\n'),
+    renderReference({ meta: META, session: bigSession(3000) }),
+  ]) {
+    const gate = text.indexOf("Send a status message FIRST");
+    assert.ok(gate > 0, "the target must report before acting");
+    assert.ok(
+      gate < text.indexOf("Check the current state of the workspace"),
+      "the message must precede workspace exploration",
+    );
+    assert.match(text, /before any workspace search, file edit, command/i);
+  }
+});
+
+test("previous todos are declared a record, not a work order", () => {
+  for (const text of [
+    inlineOf('{"n":1}\n'),
+    renderReference({ meta: META, session: bigSession(3000) }),
+  ]) {
+    assert.match(text, /record, not a work order/i);
+    assert.match(text, /never re-execute them blindly/i);
+  }
+});
+
+test("a finished task stops without re-verifying by re-implementing", () => {
+  const text = inlineOf('{"n":1}\n');
+  assert.match(text, /do not re-verify by re-implementing/i);
+  assert.match(text, /do not touch the todo list/i);
+});
+
 test("the prompt forbids the status report agents default to", () => {
   const text = inlineOf('{"n":1}\n');
   assert.match(text, /Do not write a report/i);

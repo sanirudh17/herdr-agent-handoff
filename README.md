@@ -117,8 +117,10 @@ and delivers the handoff inside the prompt.
   SHA-256 as of the handoff. A 16 MB session becomes a 4,000-character prompt.
 
 Either way the full prompt opens with _"You are taking over this session from **pi**"_ and tells the target
-to read the whole session first, treat it as history, check the workspace and prefer it where they
-disagree, preserve uncommitted work, resume from the exact stopping point, and not redo finished work.
+to read the whole session first, send a one-or-two-line status message before touching any workspace
+tool, treat history (including old todo lists) as a record rather than a work order, check the workspace
+and prefer it where they disagree, preserve uncommitted work, resume from the exact stopping point or stop
+if the work is already done, and not redo finished investigation.
 
 **Focused handoff mode** (default): the plugin derives a concise continuation
 summary from the already-resolved transcript — without prompting the live source

@@ -116,6 +116,29 @@ test("focused mode tells the target not to redo or replay history", () => {
   assert.ok(text.includes("do not redo completed work"));
   assert.ok(text.includes("do not replay old transcript"));
   assert.ok(text.includes("must not be replayed"));
+  assert.ok(text.includes("do not re-run the same searches"));
+});
+
+test("focused mode gates the status message before workspace tools", () => {
+  const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
+  const gate = text.indexOf("Send a status message FIRST");
+  assert.ok(gate > 0, "the target must report before acting");
+  assert.ok(
+    gate < text.indexOf("Inspect the current workspace before editing"),
+    "the message must precede workspace exploration",
+  );
+});
+
+test("focused mode declares previous todos a record, not a work order", () => {
+  const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
+  assert.match(text, /record, not a work order/i);
+  assert.match(text, /never re-create or re-execute them blindly/i);
+});
+
+test("a complete focused task stops without re-verifying", () => {
+  const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
+  assert.match(text, /do not re-verify by re-implementing/i);
+  assert.match(text, /do not touch the todo list/i);
 });
 
 test("focused mode labels any transcript reference as optional fallback only", () => {
