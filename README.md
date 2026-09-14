@@ -16,7 +16,10 @@ source session when exact history matters. No truncated transcript, no follow-up
 
 Invoking a handoff shows two popups in sequence: first the handoff context
 (`Focused handoff`, the default, or `Full session transcript`), then the existing
-target-agent picker.
+target-agent picker. Either way the target reports back first — a one-or-two-line
+status message — and then stops to wait for your next instruction. A handoff is a
+context transfer, never an order to begin: the target takes no other action
+(no searches, reads, edits, commands, or todo changes) without your approval.
 
 - **Focused handoff (recommended default).** The plugin derives a concise
   continuation summary from the resolved transcript — current objective, latest
@@ -117,10 +120,10 @@ and delivers the handoff inside the prompt.
   SHA-256 as of the handoff. A 16 MB session becomes a 4,000-character prompt.
 
 Either way the full prompt opens with _"You are taking over this session from **pi**"_ and tells the target
-to read the whole session first, send a one-or-two-line status message before touching any workspace
-tool, treat history (including old todo lists) as a record rather than a work order, check the workspace
-and prefer it where they disagree, preserve uncommitted work, resume from the exact stopping point or stop
-if the work is already done, and not redo finished investigation.
+to read the whole session first, send its one-or-two-line status message before anything else, then stop
+and wait for direction. It treats history (including old todo lists) as a record rather than a work order,
+checks the workspace only once directed and prefers it where they disagree, preserves uncommitted work,
+resumes from the exact stopping point when told to continue, and never redoes finished investigation.
 
 **Focused handoff mode** (default): the plugin derives a concise continuation
 summary from the already-resolved transcript — without prompting the live source

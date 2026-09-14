@@ -345,3 +345,63 @@ test("encrypted blobs and oversized tool dumps are skipped, not fatal", () => {
   assert.ok(summary.includes("Short ask."));
   assert.ok(!summary.includes("Q-PaDgE4q"));
 });
+
+const OLD_HANDOFF = [
+  "You are taking over this session from **opencode** (`opencode`).",
+  "Source session: `ses_old` | Size | 6,791 lines, 23,702,044 bytes |",
+  "SHA-256 | `9278228b629e3815dbe5dd90c82d66b819d6637032eb1cd1f`",
+  "## Focused handoff summary",
+  "",
+  "Ship the widget.",
+  "",
+  "## How to continue",
+  "Transcript reference (fallback only, do not read by default):",
+  "`C:\\old\\export-ses_old.jsonl`",
+  "-- end of handoff, begin now --",
+].join("\n");
+
+test("an embedded older handoff never poses as the current objective", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ role: "user", content: OLD_HANDOFF }),
+      JSON.stringify({ role: "assistant", content: "v0.1.13 shipped." }),
+      JSON.stringify({
+        role: "user",
+        content:
+          "C:\\Users\\sanir\\Claude Code\\glint The toggle is stuck on, see shot.png",
+      }),
+    ]),
+  });
+  assert.ok(!summary.includes("You are taking over"));
+  assert.ok(!summary.includes("9278228b"));
+  assert.ok(!summary.includes("export-ses_old.jsonl"));
+  assert.ok(summary.includes("toggle is stuck"));
+  assert.ok(summary.includes("shot.png"));
+});
+
+test("the inner summary of a chained handoff is the fallback objective", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ role: "user", content: OLD_HANDOFF }),
+      JSON.stringify({ role: "assistant", content: "Ack." }),
+    ]),
+  });
+  assert.ok(summary.includes("Ship the widget."));
+  assert.ok(!summary.includes("You are taking over"));
+});
+
+test("windows paths with spaces are captured whole", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({
+        role: "user",
+        content: "Look at C:\\Users\\sanir\\Claude Code\\glint please",
+      }),
+    ]),
+  });
+  assert.ok(summary.includes("C:\\Users\\sanir\\Claude Code\\glint"));
+  assert.ok(!summary.includes("`C:\\Users\\sanir\\Claude`"));
+});

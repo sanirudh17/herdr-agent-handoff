@@ -97,18 +97,24 @@ test("the prompt opens with an ordered set of actions, not a wall of rules", () 
   assert.ok(doThis < rules, "actions should come before the rules");
 });
 
-test("the status message is gated before any workspace tool use", () => {
+test("the handoff is a context transfer ending in stop-and-wait", () => {
   for (const text of [
     inlineOf('{"n":1}\n'),
     renderReference({ meta: META, session: bigSession(3000) }),
   ]) {
-    const gate = text.indexOf("Send a status message FIRST");
-    assert.ok(gate > 0, "the target must report before acting");
-    assert.ok(
-      gate < text.indexOf("Check the current state of the workspace"),
-      "the message must precede workspace exploration",
+    assert.match(text, /Send a status message/);
+    assert.match(text, /Send it before anything else/);
+    assert.match(text, /STOP\./);
+    assert.match(text, /Wait for the user's next instruction/);
+    assert.match(
+      text,
+      /context transfer, not an order to begin/,
+      "no autonomous action without user approval",
     );
-    assert.match(text, /before any workspace search, file edit, command/i);
+    assert.ok(
+      !text.includes("proceed directly"),
+      "the target must not continue on its own",
+    );
   }
 });
 
@@ -125,21 +131,20 @@ test("previous todos are declared a record, not a work order", () => {
 test("a finished task stops without re-verifying by re-implementing", () => {
   const text = inlineOf('{"n":1}\n');
   assert.match(text, /do not re-verify by re-implementing/i);
-  assert.match(text, /do not touch the todo list/i);
+  assert.match(text, /touch the todo list/i);
 });
 
-test("the prompt forbids the status report agents default to", () => {
+test("the status message stays short and no tool runs without direction", () => {
   const text = inlineOf('{"n":1}\n');
-  assert.match(text, /Do not write a report/i);
   assert.match(text, /one or two lines/i);
-  assert.match(
-    text,
-    /handoff \*is\* the instruction|do not wait for a fresh instruction/i,
-  );
+  assert.match(text, /No tools until the user directs/i);
+  assert.match(text, /ready for the user's next instruction/i);
 });
 
-test("the prompt says what to do when the task was already finished", () => {
-  assert.match(inlineOf('{"n":1}\n'), /already finished/i);
+test("the handoff never orders autonomous continuation", () => {
+  const text = inlineOf('{"n":1}\n');
+  assert.ok(!text.includes("proceed directly"));
+  assert.ok(!/handoff \*is\* the instruction/.test(text));
 });
 
 test("the prompt covers non-coding work explicitly", () => {
