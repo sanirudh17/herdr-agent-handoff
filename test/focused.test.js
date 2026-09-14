@@ -8,10 +8,15 @@ const path = require("node:path");
 const {
   buildSummaryRequest,
   generateFocusedSummary,
+  summarizeSession,
   validateSummary,
 } = require("../lib/focused.js");
 
-const META = { sessionId: "s1", cwd: "C:\\work" };
+const META = {
+  sessionId: "s1",
+  cwd: "C:\\work",
+  snapshotUtc: "2026-07-26T09:30:00.000Z",
+};
 
 test("the summary request is strict and names the output file", () => {
   const out = path.join(os.tmpdir(), "handoff.md");
@@ -82,5 +87,69 @@ test("generateFocusedSummary requires a caller and a source", async () => {
   await assert.rejects(
     generateFocusedSummary({ call: () => ({}), meta: META }),
     /no source pane/,
+  );
+});
+
+function sessionOf(lines) {
+  const body = Buffer.from(lines.join("\n") + "\n", "utf8");
+  return {
+    strategy: "file",
+    nativePath: "C:\\x\\rollout-1.jsonl",
+    body,
+    bytes: body.length,
+    lines: lines.length,
+    sha256: "a".repeat(64),
+    counts: null,
+    readable: true,
+  };
+}
+
+test("summarizeSession derives a structured summary without prompting anyone", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ role: "user", text: "Fix the widget in lib/widget.js" }),
+      JSON.stringify({ role: "assistant", text: "Reproduced; patching now." }),
+      JSON.stringify({ role: "user", text: "Also keep the change small." }),
+    ]),
+  });
+  assert.match(summary, /Current objective/);
+  assert.ok(summary.includes("Fix the widget"));
+  assert.ok(summary.includes("keep the change small"));
+  assert.match(summary, /Relevant files/);
+  assert.ok(summary.includes("lib/widget.js"));
+});
+
+test("summarizeSession never embeds the full transcript body", () => {
+  const marker = "focused-local-must-not-leak-67890";
+  const lines = [
+    JSON.stringify({ role: "user", text: "hello" }),
+    JSON.stringify({ role: "assistant", data: { blob: marker.repeat(20) } }),
+  ];
+  const summary = summarizeSession({ meta: META, session: sessionOf(lines) });
+  assert.ok(!summary.includes(marker));
+});
+
+test("summarizeSession degrades gracefully on unscannable transcripts", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf(['{"i":0}', '{"i":1}', "not json at all"]),
+  });
+  assert.match(summary, /Current objective/);
+  assert.match(summary, /Not identified/);
+});
+
+test("summarizeSession refuses an empty session", () => {
+  assert.throws(
+    () => summarizeSession({ meta: META, session: null }),
+    /no resolved session/,
+  );
+  assert.throws(
+    () =>
+      summarizeSession({
+        meta: META,
+        session: { ...sessionOf(['{"a":1}']), body: Buffer.alloc(0) },
+      }),
+    /no resolved session/,
   );
 });

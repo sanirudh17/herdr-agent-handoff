@@ -268,3 +268,60 @@ test("an empty focused summary is a failure, not an empty handoff", async () => 
   assert.equal(out.ok, false);
   assert.match(out.message, /Focused handoff unavailable/);
 });
+
+test("the default focused path never writes to the source pane", async () => {
+  // Regression: the first focused implementation prompted the live source
+  // agent for a summary, so the handoff appeared to run in the same agent
+  // while no new pane was created. The default path must not send the source
+  // anything — no seams, no generator, just the transcript on disk.
+  const { env, calls, file } = workspace();
+  const out = await run({
+    destination: "split",
+    env,
+    modeChoice: { mode: "focused" },
+    pickerChoice: { selected: "claude" },
+  });
+  assert.equal(out.ok, true, out.message);
+  assert.equal(out.handoffMode, "focused");
+  assert.equal(out.mode, "focused");
+
+  const argv = readCalls(calls).map((c) => c.join(" "));
+  assert.ok(
+    argv.some((a) => a.startsWith("pane split")),
+    "the target pane is created",
+  );
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(prompts.length, 1, "exactly one prompt is sent anywhere");
+  assert.equal(
+    prompts[0][2],
+    "w5:p2",
+    "the one prompt goes to the new target pane, never the source",
+  );
+  assert.equal(prompts[0][3], out.prompt);
+  const transcript = fs.readFileSync(file, "utf8");
+  assert.ok(
+    !out.prompt.includes(transcript),
+    "the transcript body must not travel as the main content",
+  );
+});
+
+test("a target that resolves to the source pane is never typed into", async () => {
+  const { env, calls } = workspace();
+  const out = await run({
+    destination: "split",
+    env: { ...env, HANDOFF_FAKE_SPLIT_PANE: "w5:p1" },
+    pickerChoice: { selected: "claude" },
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.message, MESSAGES.targetCreateFailed("split"));
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(
+    prompts.length,
+    0,
+    "nothing may be delivered when the target is the source pane",
+  );
+});

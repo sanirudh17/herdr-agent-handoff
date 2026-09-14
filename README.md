@@ -18,13 +18,14 @@ Invoking a handoff shows two popups in sequence: first the handoff context
 (`Focused handoff`, the default, or `Full session transcript`), then the existing
 target-agent picker.
 
-- **Focused handoff (recommended default).** The source agent writes a concise
-  continuation summary — current objective, completed work, current state,
-  remaining work, constraints, pitfalls not to redo, relevant files — and only
-  that summary travels as the main prompt. The full transcript, when a safe
-  reference exists, is labeled as an optional fallback the target must not read
-  by default. This prevents chained handoffs from replaying old diagnoses, old
-  bugs, and old instructions that were already resolved later in the history.
+- **Focused handoff (recommended default).** The plugin derives a concise
+  continuation summary from the resolved transcript — current objective, latest
+  request, last assistant note, session facts, files observed — without ever
+  prompting the live source pane, and only short excerpts travel, never the full
+  transcript body. The full transcript, when a safe reference exists, is labeled
+  as an optional fallback the target must not read by default. This prevents
+  chained handoffs from replaying old diagnoses, old bugs, and old instructions
+  that were already resolved later in the history.
 - **Full session transcript.** The historical behavior, unchanged: the complete
   source session is embedded when it fits the prompt budget, or referenced by
   path with line bounds and SHA-256 when it does not. Useful for exact archival
@@ -119,16 +120,20 @@ Either way the full prompt opens with _"You are taking over this session from **
 to read the whole session first, treat it as history, check the workspace and prefer it where they
 disagree, preserve uncommitted work, resume from the exact stopping point, and not redo finished work.
 
-**Focused handoff mode** (default): the source agent — the one that owns the current context — writes
-a concise continuation summary to a temp file under the plugin state dir (outside your repo), and the
-plugin delivers that summary as the main prompt. The target is told to treat the summary as authoritative,
-not to restart from history, not to redo completed work, and not to replay old transcript steps. A safe
-transcript path, when one exists, is included only as an explicitly optional fallback.
+**Focused handoff mode** (default): the plugin derives a concise continuation
+summary from the already-resolved transcript — without prompting the live source
+pane, so the handoff can never land back in the session it came from — and
+delivers that summary as the main prompt to the new target pane. The target is
+told to treat the summary as authoritative,
+not to restart from history, not to redo completed work, and not to replay old
+transcript steps. A safe transcript path, when one exists, is included only as
+an explicitly optional fallback. If the target pane ever resolves to the source
+pane id, the handoff refuses loudly instead of typing into the source.
 
 **If the complete session can't be obtained, a full handoff doesn't start.** There's no fallback to a
-truncated transcript, terminal output, a git diff, or a summary. Likewise, if the source agent fails to
-produce a focused summary, no target pane is created. The source pane is only ever read (focused mode
-prompts it once to request the summary, and never for anything else).
+truncated transcript, terminal output, a git diff, or a summary. Likewise, if no
+focused summary can be derived, no target pane is created. The source pane is
+only ever read and never sent input in either mode.
 
 ## Agent support
 

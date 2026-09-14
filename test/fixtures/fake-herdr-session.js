@@ -113,7 +113,9 @@ if (argv[0] === "pane" && argv[1] === "split") {
   ok({
     type: "pane_info",
     pane: {
-      pane_id: "w5:p2",
+      // HANDOFF_FAKE_SPLIT_PANE forces the split result, so the
+      // same-pane guard can be exercised.
+      pane_id: process.env.HANDOFF_FAKE_SPLIT_PANE || "w5:p2",
       terminal_id: "t2",
       workspace_id: "w5",
       tab_id: "w5:t1",
