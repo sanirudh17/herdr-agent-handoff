@@ -104,6 +104,20 @@ function sessionOf(lines) {
   };
 }
 
+function sessionOfBody(text, strategy = "file") {
+  const body = Buffer.from(text, "utf8");
+  return {
+    strategy,
+    nativePath: "C:\\x\\rollout-1.jsonl",
+    body,
+    bytes: body.length,
+    lines: text.split("\n").length - 1,
+    sha256: "a".repeat(64),
+    counts: null,
+    readable: true,
+  };
+}
+
 test("summarizeSession derives a structured summary without prompting anyone", () => {
   const summary = summarizeSession({
     meta: META,
@@ -152,4 +166,182 @@ test("summarizeSession refuses an empty session", () => {
       }),
     /no resolved session/,
   );
+});
+
+test("claude-style nested messages with content blocks are read", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "Fix the toggle in src/ui.ts" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: "On it." },
+            { type: "tool_use", name: "Glob", input: { pattern: "src/**" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Also keep it small." }],
+        },
+      }),
+    ]),
+  });
+  assert.ok(summary.includes("Fix the toggle"));
+  assert.ok(summary.includes("keep it small"));
+  assert.ok(summary.includes("src/ui.ts"));
+  assert.ok(!summary.includes("tool_use"));
+});
+
+test("claude file-history snapshots and summaries do not pollute excerpts", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ type: "summary", summary: "Settings bug hunt" }),
+      JSON.stringify({
+        type: "file-history-snapshot",
+        messageId: "1",
+        snapshot: { a: 1 },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "Go." },
+      }),
+    ]),
+  });
+  assert.ok(summary.includes("Go."));
+});
+
+test("a claude summary stands in when no user message is found", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ type: "summary", summary: "Settings bug hunt" }),
+    ]),
+  });
+  assert.ok(summary.includes("Settings bug hunt"));
+});
+
+test("codex rollout items with input/output blocks are read", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({
+        type: "session_meta",
+        payload: { cwd: "C:\\w", session_id: "abc" },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "Repair the build" }],
+        },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: "Build is green." }],
+        },
+      }),
+    ]),
+  });
+  assert.ok(summary.includes("Repair the build"));
+  assert.ok(summary.includes("Build is green."));
+});
+
+test("opencode sqlite-export envelopes attribute parts to messages", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOfBody(
+      [
+        JSON.stringify({
+          table: "session",
+          row: { id: "s1", title: "Toggle fix", directory: "C:\\w" },
+        }),
+        JSON.stringify({
+          table: "message",
+          row: { id: "m1", session_id: "s1", data: { role: "user" } },
+        }),
+        JSON.stringify({
+          table: "part",
+          row: {
+            id: "p1",
+            message_id: "m1",
+            session_id: "s1",
+            type: "text",
+            data: { type: "text", text: "Fix it in lib/a.js" },
+          },
+        }),
+        JSON.stringify({
+          table: "part",
+          row: {
+            id: "p2",
+            message_id: "m1",
+            session_id: "s1",
+            type: "tool",
+            data: { type: "tool", tool: "bash", command: "x".repeat(5000) },
+          },
+        }),
+      ].join("\n") + "\n",
+      "sqlite",
+    ),
+  });
+  assert.ok(summary.includes("Fix it in lib/a.js"));
+  assert.ok(summary.includes("lib/a.js"));
+});
+
+test("an opencode session title stands in when no user message is found", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOfBody(
+      JSON.stringify({
+        table: "session",
+        row: { id: "s1", title: "Toggle fix", directory: "C:\\w" },
+      }) + "\n",
+      "sqlite",
+    ),
+  });
+  assert.ok(summary.includes("Toggle fix"));
+});
+
+test("a whole-file cline messages array is read", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOfBody(
+      JSON.stringify([
+        { role: "user", content: "Cline, fix the leak" },
+        { role: "assistant", content: "Patched src/leak.ts" },
+      ]),
+    ),
+  });
+  assert.ok(summary.includes("fix the leak"));
+  assert.ok(summary.includes("src/leak.ts"));
+});
+
+test("encrypted blobs and oversized tool dumps are skipped, not fatal", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({
+        type: "reasoning",
+        status: "completed",
+        encrypted_content: "Q-PaDgE4q-".repeat(100),
+      }),
+      JSON.stringify({ role: "user", content: "Short ask." }),
+      JSON.stringify({ role: "user", text: "y" }),
+    ]),
+  });
+  assert.ok(summary.includes("Short ask."));
+  assert.ok(!summary.includes("Q-PaDgE4q"));
 });
