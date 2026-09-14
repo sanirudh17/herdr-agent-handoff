@@ -129,6 +129,18 @@ test("focused mode ends in stop-and-wait, never autonomous action", () => {
   assert.ok(!text.includes("proceed directly"));
 });
 
+test("the focused status message is a neat bullet report", () => {
+  const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
+  for (const bullet of [
+    "**Objective**",
+    "**Done**",
+    "**Stopping point**",
+    "**Next**",
+  ]) {
+    assert.ok(text.includes(bullet), `status shape must name ${bullet}`);
+  }
+});
+
 test("focused mode declares previous todos a record, not a work order", () => {
   const text = renderFocused({ meta: META, summary: SUMMARY, session: null });
   assert.match(text, /record, not a work order/i);

@@ -16,9 +16,10 @@ source session when exact history matters. No truncated transcript, no follow-up
 
 Invoking a handoff shows two popups in sequence: first the handoff context
 (`Focused handoff`, the default, or `Full session transcript`), then the existing
-target-agent picker. Either way the target reports back first — a one-or-two-line
-status message — and then stops to wait for your next instruction. A handoff is a
-context transfer, never an order to begin: the target takes no other action
+target-agent picker. Either way the target reports back first — a short bulleted
+status message (**Objective**, **Done**, **Stopping point**, **Next**) — and then
+stops to wait for your next instruction. A handoff is a context transfer, never an
+order to begin: the target takes no other action
 (no searches, reads, edits, commands, or todo changes) without your approval.
 
 - **Focused handoff (recommended default).** The plugin derives a concise

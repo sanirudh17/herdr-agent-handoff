@@ -134,11 +134,18 @@ test("a finished task stops without re-verifying by re-implementing", () => {
   assert.match(text, /touch the todo list/i);
 });
 
-test("the status message stays short and no tool runs without direction", () => {
+test("the status message is a neat bullet report, still with no tools", () => {
   const text = inlineOf('{"n":1}\n');
-  assert.match(text, /one or two lines/i);
+  for (const bullet of [
+    "**Objective**",
+    "**Done**",
+    "**Stopping point**",
+    "**Next**",
+  ]) {
+    assert.ok(text.includes(bullet), `status shape must name ${bullet}`);
+  }
+  assert.match(text, /ready for your next instruction/i);
   assert.match(text, /No tools until the user directs/i);
-  assert.match(text, /ready for the user's next instruction/i);
 });
 
 test("the handoff never orders autonomous continuation", () => {
