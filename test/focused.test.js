@@ -405,3 +405,46 @@ test("windows paths with spaces are captured whole", () => {
   assert.ok(summary.includes("C:\\Users\\sanir\\Claude Code\\glint"));
   assert.ok(!summary.includes("`C:\\Users\\sanir\\Claude`"));
 });
+
+test("vacuous continuations never pose as the objective", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ role: "user", content: "Please continue" }),
+      JSON.stringify({
+        role: "user",
+        content: "Repair the settings toggle in src/set.ts",
+      }),
+      JSON.stringify({ role: "assistant", content: "On it." }),
+    ]),
+  });
+  assert.ok(summary.includes("Repair the settings toggle"));
+  assert.ok(!summary.includes("Please continue"));
+});
+
+test("the latest request walks back past acknowledgments", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({ role: "user", content: "Repair the toggle" }),
+      JSON.stringify({ role: "assistant", content: "Done." }),
+      JSON.stringify({ role: "user", content: "thanks!" }),
+    ]),
+  });
+  assert.ok(summary.includes("Repair the toggle"));
+  assert.ok(!summary.includes("thanks!"));
+});
+
+test("prose glued after a file path is cut from the file entry", () => {
+  const summary = summarizeSession({
+    meta: META,
+    session: sessionOf([
+      JSON.stringify({
+        role: "user",
+        content: "See C:\\tmp\\shot-123.png Okay, there's the bug",
+      }),
+    ]),
+  });
+  assert.ok(summary.includes("`C:\\tmp\\shot-123.png`"));
+  assert.ok(!summary.includes("`C:\\tmp\\shot-123.png Okay`"));
+});
