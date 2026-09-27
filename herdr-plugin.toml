@@ -27,6 +27,13 @@ contexts = ["pane"]
 command = ["node", "bin/handoff-tab.js"]
 
 [[actions]]
+id = "handoff-headless"
+title = "Handoff to agent (headless)"
+description = "Transfer the active pane session without opening a picker (automation: set HERDR_HANDOFF_TARGET or pass --target)"
+contexts = ["pane"]
+command = ["node", "bin/handoff-headless.js"]
+
+[[actions]]
 id = "setup-keys"
 title = "Install Agent Handoff keybindings"
 description = "Add prefix+a and prefix+shift+a to config.toml"
