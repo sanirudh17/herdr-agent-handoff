@@ -1734,3 +1734,34 @@ test("an agent that exits leaving its pane behind is reported, not passed over",
   assert.equal(out.agentExited, true);
   assert.equal(out.message, MESSAGES.agentExited("Claude Code"));
 });
+
+test("a missing session reference is waited out when the transcript lands late", async () => {
+  // pi with no reference yet: the pane has a conversation but nothing flushed.
+  // Previously "Herdr reported no session reference" failed on the spot; now it
+  // is retried like every other not-there-yet signal, so a transcript landing a
+  // moment later still hands off.
+  const { env, home } = workspace({ agent: "pi", sessionRef: null });
+  const { piDirName } = require("../lib/sources.js");
+  const dir = path.join(home, ".pi", "agent", "sessions", piDirName(home));
+  const timer = setTimeout(() => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "2026-07-24T00-00-00-000Z_late.jsonl"),
+      JSON.stringify({ role: "user", content: "hello" }) + "\n",
+    );
+  }, 150);
+  try {
+    const out = await run({
+      destination: "tab",
+      env: {
+        ...env,
+        HANDOFF_RESOLVE_RETRY_MS: "40",
+        HANDOFF_RESOLVE_RETRIES: "50",
+      },
+      pickerChoice: { selected: "pi" },
+    });
+    assert.equal(out.ok, true, out.message || out.detail);
+  } finally {
+    clearTimeout(timer);
+  }
+});

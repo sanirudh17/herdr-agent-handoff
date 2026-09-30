@@ -325,3 +325,131 @@ test("a target that resolves to the source pane is never typed into", async () =
     "nothing may be delivered when the target is the source pane",
   );
 });
+
+test("delivery timings default to the fast set, keeping only the agy hold long", async () => {
+  const { timings } = require("../lib/handoff.js");
+  const t = timings({});
+  assert.equal(t.settle, 400);
+  assert.equal(t.still, 1200);
+  assert.equal(t.grace, 5000);
+  assert.equal(t.confirmWindow, 15000);
+  assert.equal(t.persist, 1500);
+  assert.equal(t.nudge, 1200);
+  assert.equal(t.postSubmit, 350);
+  assert.equal(t.busyConfirm, 300);
+  assert.equal(t.fastCheck, 250);
+  assert.equal(t.resolveRetries, 6);
+  assert.equal(t.resolveRetryMs, 400);
+  assert.equal(t.agyTuiSettle, 15000);
+});
+
+test("an explicit focused summary needs no transcript at all", async () => {
+  // A source kind with no session store (amp) and no session reference: there
+  // is nothing on disk to resolve, yet the caller-supplied summary is enough.
+  const { env, calls } = workspace({ agent: "amp", sessionRef: null });
+  const focused = require("../lib/focused.js");
+  const real = focused.generateFocusedSummary;
+  focused.generateFocusedSummary = async () => {
+    throw new Error("live fallback must not run when a summary was supplied");
+  };
+  try {
+    const out = await run({
+      destination: "split",
+      env,
+      modeChoice: { mode: "focused" },
+      pickerChoice: { selected: "claude" },
+      focusedSummary: SUMMARY,
+    });
+    assert.equal(out.ok, true, out.message || out.detail);
+    assert.equal(out.handoffMode, "focused");
+    assert.ok(out.prompt.includes("Finish the widget."));
+    assert.match(out.prompt, /No safe transcript reference available/);
+    const prompts = readCalls(calls).filter(
+      (c) => c[0] === "agent" && c[1] === "prompt",
+    );
+    assert.equal(prompts.length, 1);
+    assert.equal(prompts[0][2], "w5:p2");
+  } finally {
+    focused.generateFocusedSummary = real;
+  }
+});
+
+test("focused falls back to the live source agent when no transcript exists", async () => {
+  const { env, calls } = workspace({ agent: "amp", sessionRef: null });
+  const focused = require("../lib/focused.js");
+  const real = focused.generateFocusedSummary;
+  let seen = null;
+  focused.generateFocusedSummary = async (args) => {
+    seen = args;
+    return SUMMARY;
+  };
+  try {
+    const out = await run({
+      destination: "split",
+      env,
+      modeChoice: { mode: "focused" },
+      pickerChoice: { selected: "claude" },
+    });
+    assert.equal(out.ok, true, out.message || out.detail);
+    assert.equal(out.handoffMode, "focused");
+    assert.equal(out.mode, "focused");
+    assert.ok(seen && seen.sourcePaneId === "w5:p1");
+    assert.ok(out.prompt.includes("Finish the widget."));
+    assert.match(out.prompt, /No safe transcript reference available/);
+    const prompts = readCalls(calls).filter(
+      (c) => c[0] === "agent" && c[1] === "prompt",
+    );
+    assert.equal(prompts.length, 1);
+    assert.equal(
+      prompts[0][2],
+      "w5:p2",
+      "the one prompt goes to the new target pane, never the source",
+    );
+  } finally {
+    focused.generateFocusedSummary = real;
+  }
+});
+
+test("a failed live fallback reports instead of hanging or typing", async () => {
+  const { env, calls } = workspace({ agent: "amp", sessionRef: null });
+  const focused = require("../lib/focused.js");
+  const real = focused.generateFocusedSummary;
+  focused.generateFocusedSummary = async () => {
+    throw new Error("source stayed silent");
+  };
+  try {
+    const out = await run({
+      destination: "split",
+      env,
+      modeChoice: { mode: "focused" },
+      pickerChoice: { selected: "claude" },
+    });
+    assert.equal(out.ok, false);
+    assert.match(out.message, /Focused handoff unavailable/);
+    const argv = readCalls(calls).map((c) => c.join(" "));
+    assert.ok(!argv.some((a) => a.startsWith("pane split")));
+    assert.ok(!argv.some((a) => a.startsWith("tab create")));
+  } finally {
+    focused.generateFocusedSummary = real;
+  }
+});
+
+test("a dry run never prompts the live source pane", async () => {
+  const { env, calls } = workspace({ agent: "amp", sessionRef: null });
+  const out = await run({
+    destination: "split",
+    env,
+    dryRun: true,
+    handoffMode: "focused",
+  });
+  assert.equal(out.ok, false);
+  assert.match(out.message, /Focused handoff unavailable/);
+  const prompts = readCalls(calls).filter(
+    (c) => c[0] === "agent" && c[1] === "prompt",
+  );
+  assert.equal(
+    prompts.length,
+    0,
+    "dry runs stay side-effect free: the source is never asked",
+  );
+});
